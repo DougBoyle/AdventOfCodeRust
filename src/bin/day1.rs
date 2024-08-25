@@ -26,6 +26,7 @@ trait LineProcessor {
     fn process(&self, line: String) -> u32;
 }
 
+#[allow(dead_code)]
 struct LineProcessor1;
 
 impl LineProcessor for LineProcessor1 {
@@ -37,6 +38,7 @@ impl LineProcessor for LineProcessor1 {
 }
 
 impl LineProcessor1 {
+    #[allow(dead_code)]
     fn first_and_last<T: Copy>(iter: impl std::iter::Iterator<Item=T>) -> (T, T) {
         let mut iter = iter.peekable();
         let first = *iter.peek().unwrap();
