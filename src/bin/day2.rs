@@ -1,5 +1,7 @@
 use std::str::FromStr;
 
+use rust_aoc::split_in_two;
+
 use enum_map::{enum_map, Enum, EnumMap};
 
 fn main() {
@@ -84,10 +86,7 @@ impl FromStr for Game {
 
 impl Game {
     fn split_game_and_rounds(str: &str) -> (&str, &str) {
-        let game_and_rounds: Vec<_> = str.split(':').collect();
-        assert!(game_and_rounds.len() == 2);
-        let [game, rounds]: [_; 2] = game_and_rounds[0..2].try_into().unwrap();
-        (game, rounds)
+        split_in_two(str, ':')
     }
 
     // Expects 'Game N'
@@ -107,9 +106,7 @@ impl Game {
 
     // Expects 'n green'
     fn parse_count_and_color(count_and_color: &str) -> (u32, Color) {
-        let split: Vec<_> = count_and_color.trim().split(' ').collect();
-        assert!(split.len() == 2);
-        let [count, color] = split[0..2].try_into().unwrap();
+        let (count, color) = split_in_two(count_and_color.trim(), ' ');
         let count = count.parse().unwrap();
         let color = color.parse().unwrap();
         (count, color)

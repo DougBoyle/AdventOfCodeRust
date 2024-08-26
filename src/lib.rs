@@ -11,3 +11,9 @@ pub fn read_input(day: u32) -> impl Iterator<Item=String> {
     let f = File::open(&filename).expect(format!("Couldn't open {filename}").as_str());
     BufReader::new(f).lines().map(Result::unwrap)
 }
+
+pub fn split_in_two(s: &str, separator: char) -> (&str, &str) {
+    let split: Vec<_> = s.split(separator).collect();
+    assert!(split.len() == 2);
+    (split[0], split[1])
+}
