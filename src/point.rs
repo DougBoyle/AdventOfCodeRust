@@ -16,6 +16,21 @@ impl std::ops::AddAssign for Point {
     }
 }
 
+impl std::ops::Sub for Point {
+    type Output = Point;
+    
+    fn sub(self, rhs: Point) -> Point {
+        Point { x: self.x - rhs.x, y: self.y - rhs.y }
+    }
+}
+
+impl std::ops::SubAssign for Point {
+    fn sub_assign(&mut self, rhs: Point) {
+        self.x -= rhs.x;
+        self.y -= rhs.y;
+    }
+}
+
 impl std::fmt::Display for Point {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "({}, {})", self.x, self.y)
