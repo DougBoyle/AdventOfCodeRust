@@ -10,9 +10,7 @@ fn main() {
     let mut grid = HashMap::new();
     let mut start = Point {x: -1, y: -1};
     
-    rust_aoc::read_input(10).enumerate().for_each(|(y, line)| 
-        parse_row(&line, y.try_into().unwrap(), &mut grid, &mut start)
-    );
+    rust_aoc::parse_grid(10, |p, c| { parse(p, c, &mut grid, &mut start) });
 
     println!("Grid: {}", grid.len());
     println!("Start: {start}");
@@ -34,15 +32,7 @@ fn main() {
 
 }
 
-fn parse_row(row: &str, y: i32, grid: &mut Grid, start: &mut Point) {
-    let y = y.try_into().unwrap();
-    row.chars().enumerate().for_each(|(x, c)| 
-        parse(x.try_into().unwrap(), y, c, grid, start)
-    )
-}
-
-fn parse(x: i32, y: i32, c: char, grid: &mut Grid, start: &mut Point) {
-    let point = Point { x, y };
+fn parse(point: Point, c: char, grid: &mut Grid, start: &mut Point) {
     if c == '.' {
             return
     } else if c == 'S' { 
