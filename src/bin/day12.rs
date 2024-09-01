@@ -1,9 +1,9 @@
-use std::{collections::{BTreeSet, HashSet, VecDeque}, io::{Error, ErrorKind}, str::FromStr};
+use std::{collections::HashMap, io::{Error, ErrorKind}, str::FromStr};
 
 fn main() {
-    println!("PART 1");
+    println!("Part 1");
     Part1::process();
-    println!("PART 2");
+    println!("Part 2");
     Part2::process();
 }
 
@@ -12,11 +12,10 @@ trait Part {
 
     fn process() {
         let total: usize = rust_aoc::read_input(12).map(Self::parse)
-            .map(|conf| { println!("Solving {conf:?}"); conf })
             .map(Configuration::permutations)
-            .map(|n| { println!("{n}"); n })
             .sum();
         // 1. 6827
+        // 2. 1537505634471
         println!("Total ways: {total}");
     }
 }
@@ -31,13 +30,12 @@ impl Part for Part1 {
 
 struct Part2;
 
-// TODO: Would it help to memo-ize some parts of it?
 impl Part for Part2 {
     fn parse(s: String) -> Configuration {
         let config: Configuration = s.parse().unwrap();
         let mut states = config.states.clone();
         for _ in 1..5 {
-            states.push_back(State::Unknown);
+            states.push(State::Unknown);
             states.append(&mut config.states.clone());
         }
         let mut groups = config.groups.clone();
@@ -48,71 +46,79 @@ impl Part for Part2 {
     }
 }
 
-#[derive(Clone, Debug)]
-struct Configuration {
-    states: VecDeque<State>,
-    groups: VecDeque<usize>,
+struct MemoTable {
+    configuration: Configuration,
+    // (state, group) -> permutations for {states[state..], groups[group..]}
+    permutations: HashMap<(usize, usize), usize>
 }
 
-// TODO: Rather than every branch, just pick next tile to start group on?
-//       i.e. if we split at a ?, can simplify next cases as: ? is #, or ? is blank and drop all blanks immediately after too
-impl Configuration {
-    /// '#' at ether end of States is always the start/end of the group.
-    /// Check validity before calling?
-    fn permutations(mut self) -> usize {
-        // Drop blanks
-        while !self.states.is_empty() && self.states[0] == State::Blank { self.states.pop_front(); }
+impl MemoTable {
+    fn new(configuration: Configuration) -> MemoTable {
+        MemoTable { configuration, permutations: HashMap::new() }
+    }
 
-        // Base case: empty states
-        if self.states.is_empty() {
-            return if self.groups.is_empty() { 1 } else { 0 }
+    fn get(&mut self, state: usize, group: usize) -> usize {
+        match self.permutations.get(&(state, group)) {
+            Some(perms) => *perms,
+            None => {
+                let perms = self.calc_permutations(state, group);
+                self.permutations.insert((state, group), perms);
+                perms
+            }
         }
+    }
 
-        // avoid recursing down the wrong branch too far
-        // TODO: Improve the minimum, step forwards on known blank tiles when predicting filling in runs?
-        if self.states.len() < Configuration::minimum_length(&self.groups) { return 0 }
+    fn calc_permutations(&mut self, state: usize, group: usize) -> usize {
+        let states = &self.configuration.states;
 
-        // simplify
-        match &self.states[0] {
-            State::Blank => panic!("Bug: Should have discarded blanks already"),
-            State::Occupied => {
-                // discard first group if possible, else refute
-                let run = self.groups.pop_front();
-                match run {
-                    None => 0,
-                    Some(run) => {
-                        // TODO: 'pop_run' function?
-                        for _ in 0..run {
-                            match self.states.pop_front() {
-                                None | Some(State::Blank) => { return 0 },
-                                _ => {}
-                            }
-                        }
-                        // and one more for the separator after the run, here None is allowed if we hit the end
-                        match self.states.pop_front() {
-                            Some(State::Occupied) => { return 0 },
-                            _ => {}
-                        }
-                        self.permutations()
-                    },
-                }
-            },
-            State::Unknown => {
-                // Treat as occupied
-                let mut occupied = self.clone();
-                occupied.states[0] = State::Occupied;
-                // Treat as blank
-                let mut blank = self;
-                blank.states.pop_front();
-                blank.permutations() + occupied.permutations()
+        match states.get(state) {
+            None => if group == self.configuration.groups.len() { 1 } else { 0 }
+            Some(State::Blank) => self.get(state + 1, group),
+            Some(State::Occupied) => self.calc_permutations_occupied(state, group),
+            Some(State::Unknown) => {
+                let occupied_perms = self.calc_permutations_occupied(state, group);
+                let blank_perms = self.get(state + 1, group);
+                occupied_perms + blank_perms
             },
         }
     }
 
-    // TODO: Be smarter about this?
-    fn minimum_length(groups: &VecDeque<usize>) -> usize {
-        if groups.len() == 0 { return 0 }
-        groups.iter().sum::<usize>() + groups.len() - 1
+    /// Assumes configurations.states[state] is Occupied, without checking, as it is used to handle both Occupied and Unknown.
+    fn calc_permutations_occupied(&mut self, mut state: usize, group: usize) -> usize {
+        let states = &self.configuration.states;
+
+        let run = self.configuration.groups.get(group);
+        match run {
+            None => 0,
+            Some(run) => {
+                let run = *run;
+                for i in 1..run {
+                    match states.get(state + i) {
+                        None | Some(State::Blank) => { return 0 },
+                        _ => {}
+                    }
+                }
+                state += run;
+                match states.get(state) {
+                    Some(State::Occupied) => { return 0 },
+                    Some(_) => { state += 1 },
+                    None => {},
+                }
+                self.get(state, group + 1)
+            },
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+struct Configuration {
+    states: Vec<State>,
+    groups: Vec<usize>,
+}
+
+impl Configuration {
+    fn permutations(self) -> usize {
+        MemoTable::new(self).get(0, 0)
     }
 }
 
