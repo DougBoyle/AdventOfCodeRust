@@ -5,6 +5,7 @@ use std::{
 };
 
 pub mod point;
+pub mod direction;
 
 pub fn read_input(day: u32) -> impl Iterator<Item=String> {
     let filename = format!("resources/day{day}.txt");
@@ -16,4 +17,10 @@ pub fn split_in_two(s: &str, separator: char) -> (&str, &str) {
     let split: Vec<_> = s.split(separator).collect();
     assert!(split.len() == 2);
     (split[0], split[1])
+}
+
+pub fn assert_single<T, I: Iterator<Item=T>>(it: I) -> T {
+    let items: Vec<_> = it.collect();
+    assert!(items.len() == 1);
+    items.into_iter().next().unwrap()
 }

@@ -1,7 +1,8 @@
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, HashMap};
 use std::io::{Error, ErrorKind};
-use std::ops::Add;
+use std::ops::Deref;
 use rust_aoc::point::Point;
+use rust_aoc::direction::Direction;
 
 type Grid = HashMap<Point, Tile>;
 
@@ -16,67 +17,18 @@ fn main() {
     println!("Grid: {}", grid.len());
     println!("Start: {start}");
 
-    let start_pipes: Vec<_> = point_neighbours(&start).iter()
-        .map(|p| grid.get(p)).filter(Option::is_some).map(Option::unwrap)
-        .filter(|tile| tile.connects_to(&start)).collect();
-
+    let start_pipes = Tile::tiles_connecting_to_point(start, &grid);
     assert!(start_pipes.len() == 2);
+    
+    let start = Tile::infer_from_points(start, start_pipes[0].point, start_pipes[1].point);
+    grid.insert(start.point, start); // fill in 'S' tile of grid
 
-    let mut previous_point = start;
-    let mut current = *start_pipes[0];
-    let end = *start_pipes[1];
+    let loop_pipes = Tile::traverse_loop(start, &grid);
 
-    // Populate start properly, kind not made clear from parsing grid
-    let start_kind = infer_kind(start, current.point, end.point);
-    let start = Tile { kind: start_kind, point: start };
-    grid.insert(start.point, start);
+    println!("Loop size: {}", loop_pipes.len());
+    println!("Distance to midpoint: {}", loop_pipes.len() / 2); // 6717
 
-    let mut pipes = vec![start];
-    while current.point != end.point {
-        pipes.push(current);
-        let next_point = current.get_connected_points().into_iter().filter(|p| *p != previous_point).next().unwrap();
-        previous_point = current.point;
-        current = *grid.get(&next_point).unwrap();
-    }
-    pipes.push(end);
-
-    println!("Loop size: {}", pipes.len());
-    println!("Distance to midpoint: {}", pipes.len() / 2); // 6717
-
-    // Strategy: Get bounds of loop, then just scan rows to work out how many tiles are 'inside' the loop
-    let mut pipes_by_row: BTreeMap<i32, Vec<Point>> = BTreeMap::new();
-    for Tile { point: p @ Point { y, ..}, ..} in pipes {
-        pipes_by_row.entry(y).or_default().push(p);
-    }
-    // Middle row: only bit on right is 'inside', need to track if line present below/above (B/A)
-    //                 |----\
-    //    /-----\   /--/    |
-    //    |     \---/       |
-    //() (B)   ()  (B)(BA)  ()
-    let contained_tiles: i32 = pipes_by_row.into_values().map(|row| {
-        let mut row: Vec<_> = row.iter().collect();
-        row.sort_by_key(|p| p.x); // could we have stored sorted to begin with?
-        let mut line_below = false;
-        let mut line_above = false;
-        row.windows(2).map(|start_end| {
-            let start = start_end[0];
-            let end = start_end[1];
-            let start_dirs = grid.get(start).unwrap().kind.directions();
-            for dir in start_dirs {
-                match dir {
-                    Direction::North => { line_above = !line_above; }
-                    Direction::South => { line_below = !line_below; }
-                    _ => {}
-                }
-            }
-            
-            if line_above && line_below {
-                end.x - start.x - 1 // end = start + 1 => no gap between them
-            } else {
-                0
-            }
-        }).sum::<i32>()
-    }).sum();
+    let contained_tiles = count_enclosed_cells(loop_pipes);
 
     println!("Contains {contained_tiles} tiles"); // 381
 
@@ -101,14 +53,38 @@ fn parse(x: i32, y: i32, c: char, grid: &mut Grid, start: &mut Point) {
     }
 }
 
-fn infer_kind(p: Point, p1: Point, p2: Point) -> TileKind {
-    let dir1 = Direction::try_from(p1 - p).unwrap();
-    let dir2 = Direction::try_from(p2 - p).unwrap();
-    TileKind::try_from((dir1, dir2)).unwrap()
-}
-
-fn point_neighbours(p: &Point) -> Vec<Point> {
-    Direction::all().iter().map(|d| *p + *d).collect()
+fn count_enclosed_cells(loop_tiles: Vec<Tile>) -> i32 {
+    // Strategy: Scan rows to work out how many tiles are 'inside' the loop
+    let mut pipes_by_row: BTreeMap<i32, BTreeMap<i32, Tile>> = BTreeMap::new();
+    for tile in loop_tiles {
+        pipes_by_row.entry(tile.y).or_default().insert(tile.x, tile);
+    }
+    // Middle row: only bit on right is 'inside', need to track if line present below/above (B/A)
+    //                 |----\
+    //    /-----\   /--/    |
+    //    |     \---/       |
+    //() (B)   ()  (B)(BA)  ()
+    pipes_by_row.into_values().map(|row| {
+        let mut line_below = false;
+        let mut line_above = false;
+        row.into_values().collect::<Vec<_>>().windows(2)
+            .map(|w| TryInto::<[Tile; 2]>::try_into(w).unwrap())
+            .map(|[start, end]| {
+            for dir in start.kind.directions() {
+                match dir {
+                    Direction::North => { line_above = !line_above; }
+                    Direction::South => { line_below = !line_below; }
+                    _ => {}
+                }
+            }
+            
+            if line_above && line_below {
+                end.x - start.x - 1 // end = start + 1 => no gap between them
+            } else {
+                0
+            }
+        }).sum::<i32>()
+    }).sum()
 }
 
 #[derive(Copy, Clone)]
@@ -124,7 +100,50 @@ impl Tile {
 
     fn get_connected_points(&self) -> Vec<Point> {
         self.kind.directions().iter().map(|d| self.point + *d).collect()
-    }   
+    }
+
+    fn tiles_connecting_to_point(p: Point, grid: &Grid) -> Vec<Tile> {
+        p.orthogonal_neighbours().iter()
+            .map(|p| grid.get(p)).filter(Option::is_some).map(Option::unwrap)
+            .filter(|tile| tile.connects_to(&p))
+            .map(|tile| *tile)
+            .collect()
+    }
+
+    fn infer_from_points(point: Point, p1: Point, p2: Point) -> Tile {
+        let kind = TileKind::infer_from_points(point, p1, p2);
+        Tile { kind, point }
+    }
+
+    fn traverse_loop(start: Tile, grid: &Grid) -> Vec<Tile> {
+        let mut loop_tiles = vec![start];
+        let mut previous = start;
+
+        // pick an arbitrary direction to traverse in
+        let neighbours = grid.get(&previous).unwrap().get_connected_points();
+        assert!(neighbours.len() == 2);
+        let mut current = *grid.get(&neighbours[0]).unwrap();
+
+        while current.point != start.point {
+            loop_tiles.push(current);
+            // Should be exactly 1 choice
+            let next_points = current.get_connected_points().into_iter().filter(|p| *p != previous.point);
+            let next_point = rust_aoc::assert_single(next_points);
+
+            previous = current;
+            current = *grid.get(&next_point).unwrap();
+        }
+
+        loop_tiles
+    }
+}
+
+impl Deref for Tile {
+    type Target = Point;
+
+    fn deref(&self) -> &Self::Target {
+        &self.point
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -151,6 +170,12 @@ impl TileKind {
             TileKind::SouthEast => [Direction::South, Direction::East],
             TileKind::SouthWest => [Direction::South, Direction::West],
         }
+    }
+
+    fn infer_from_points(p: Point, p1: Point, p2: Point) -> TileKind {
+        let dir1 = Direction::try_from(p1 - p).unwrap();
+        let dir2 = Direction::try_from(p2 - p).unwrap();
+        TileKind::try_from((dir1, dir2)).unwrap()
     }
 }
 
@@ -184,57 +209,6 @@ impl TryFrom<(Direction, Direction)> for TileKind {
             Ok(*kind)
         } else {
             Err(Error::new(ErrorKind::InvalidInput, format!("({d1:?}, {d2:?}) does not correspond to a tile")))
-        }
-    }
-}
-
-// TODO: Move to library?
-#[derive(Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Debug)]
-enum Direction {
-    North,
-    East,
-    South,
-    West
-}
-
-impl Direction {
-    fn all() -> [Direction; 4] {
-        [Direction::North, Direction::South, Direction::East, Direction::West]
-    }
-}
-
-impl Add<Direction> for Point {
-    type Output = Point;
-    
-    fn add(self, dir: Direction) -> Self::Output {
-        match dir {
-            Direction::North => Point { x: self.x, y: self.y - 1 },
-            Direction::South => Point { x: self.x, y: self.y + 1 },
-            Direction::East => Point { x: self.x + 1, y: self.y },
-            Direction::West => Point { x: self.x - 1, y: self.y },
-        }
-    }
-}
-
-impl TryFrom<Point> for Direction {
-    type Error = Error;
-
-    fn try_from(value: Point) -> Result<Self, Self::Error> {
-        if let Some(d) = Direction::all().iter().filter(|d| Point::from(**d) == value).next() {
-            Ok(*d)
-        } else {
-            Err(Error::new(ErrorKind::InvalidInput, format!("{value} does not correspond to a direction")))
-        }
-    }
-}
-
-impl From<Direction> for Point {
-    fn from(value: Direction) -> Self {
-        match value {
-            Direction::North => Point { x: 0, y: -1 },
-            Direction::South => Point { x: 0, y: 1 },
-            Direction::East => Point { x: 1, y: 0 },
-            Direction::West => Point { x: -1, y: 0 },
         }
     }
 }

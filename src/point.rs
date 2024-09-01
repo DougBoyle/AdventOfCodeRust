@@ -1,4 +1,6 @@
-#[derive(Copy, Clone, Eq, PartialEq, Hash)]
+use crate::direction::Direction;
+
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub struct Point { pub x: i32, pub y: i32 }
 
 impl std::ops::Add for Point {
@@ -78,5 +80,9 @@ impl Point {
 
     pub fn to_exclusive(self, end: Point) -> impl Iterator<Item=Point> {
         PointIterator::new(self, end, false)
+    }
+
+    pub fn orthogonal_neighbours(&self) -> Vec<Point> {
+        Direction::all().iter().map(|d| *self + *d).collect()
     }
 }

@@ -1,0 +1,52 @@
+use std::{io::{Error, ErrorKind}, ops::Add};
+use crate::point::Point;
+
+#[derive(Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Debug)]
+pub enum Direction {
+    North,
+    East,
+    South,
+    West
+}
+
+impl Direction {
+    pub fn all() -> [Direction; 4] {
+        [Direction::North, Direction::South, Direction::East, Direction::West]
+    }
+}
+
+impl Add<Direction> for Point {
+    type Output = Point;
+    
+    fn add(self, dir: Direction) -> Self::Output {
+        match dir {
+            Direction::North => Point { x: self.x, y: self.y - 1 },
+            Direction::South => Point { x: self.x, y: self.y + 1 },
+            Direction::East => Point { x: self.x + 1, y: self.y },
+            Direction::West => Point { x: self.x - 1, y: self.y },
+        }
+    }
+}
+
+impl TryFrom<Point> for Direction {
+    type Error = Error;
+
+    fn try_from(value: Point) -> Result<Self, Self::Error> {
+        if let Some(d) = Direction::all().iter().filter(|d| Point::from(**d) == value).next() {
+            Ok(*d)
+        } else {
+            Err(Error::new(ErrorKind::InvalidInput, format!("{value} does not correspond to a direction")))
+        }
+    }
+}
+
+impl From<Direction> for Point {
+    fn from(value: Direction) -> Self {
+        match value {
+            Direction::North => Point { x: 0, y: -1 },
+            Direction::South => Point { x: 0, y: 1 },
+            Direction::East => Point { x: 1, y: 0 },
+            Direction::West => Point { x: -1, y: 0 },
+        }
+    }
+}
