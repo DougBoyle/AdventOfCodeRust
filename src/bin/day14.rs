@@ -109,35 +109,31 @@ fn cycle(grid: &mut Grid) {
 }
 
 fn tilt(dir: Direction, grid: &mut Grid) {
-    let mut updated = true;
-    while updated {
-        updated = false;
-        let mut new_cells = grid.cells.clone();
-        for (&point, _) in grid.cells.iter().filter(|(_, rock)| **rock == Rock::Round) {
-            updated |= roll_rock(point, dir, &mut new_cells, &grid);
+    let mut rollable = get_rollable_rocks(grid, dir);
+    while !rollable.is_empty() {
+        for p in rollable {
+            let mut new_point = p + dir;
+            while can_roll(&new_point, dir, grid) { new_point += dir }
+            grid.cells.remove(&p);
+            grid.cells.insert(new_point, Rock::Round);
         }
-        grid.cells = new_cells;
+        rollable = get_rollable_rocks(grid, dir);
     }
 }
 
-/// Attempt to roll a rock at `point` in direction `dir`. Returns `true` if it moved, updating `cells`
-fn roll_rock(point: Point, dir: Direction, new_cells: &mut Cells, grid: &Grid) -> bool {
-    let mut new_point = point;
-    let mut next = new_point + dir;
-    while !new_cells.contains_key(&next) && is_in_bounds(next, grid) {
-        new_point = next;
-        next = new_point + dir;
-    }
-    if new_point != point {
-        new_cells.remove(&point);
-        new_cells.insert(new_point, Rock::Round);
-        true
-    } else {
-        false
-    }
+fn get_rollable_rocks(grid: &Grid, dir: Direction) -> Vec<Point> {
+    grid.cells.iter()
+        .filter(|(_, &rock)| rock == Rock::Round)
+        .map(|(&p, _)| p)
+        .filter(|p| can_roll(p, dir, grid)).collect()
 }
 
-fn is_in_bounds(point: Point, grid: &Grid) -> bool {
+fn can_roll(point: &Point, dir: Direction, grid: &Grid) -> bool {
+    let next = *point + dir;
+    is_in_bounds(&next, grid) && !grid.cells.contains_key(&next)   
+}
+
+fn is_in_bounds(point: &Point, grid: &Grid) -> bool {
     point.x >= 0 && point.y >= 0 && point.x < grid.width && point.y < grid.height
 }
 
@@ -149,6 +145,8 @@ fn parse(p: Point, c: char, cells: &mut Cells) {
     }
 }
 
+/// Grid is around 100 x 100, and quite densely populated,
+/// so a simple array might actually be faster, but --release build still takes <1s.
 type Cells = HashMap<Point, Rock>;
 
 struct Grid {

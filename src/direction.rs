@@ -1,4 +1,4 @@
-use std::{io::{Error, ErrorKind}, ops::Add};
+use std::{io::{Error, ErrorKind}, ops::{Add, AddAssign}};
 use crate::point::Point;
 
 #[derive(Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Debug)]
@@ -24,6 +24,17 @@ impl Add<Direction> for Point {
             Direction::South => Point { x: self.x, y: self.y + 1 },
             Direction::East => Point { x: self.x + 1, y: self.y },
             Direction::West => Point { x: self.x - 1, y: self.y },
+        }
+    }
+}
+
+impl AddAssign<Direction> for Point {
+    fn add_assign(&mut self, dir: Direction) {
+        match dir {
+            Direction::North => self.y -= 1,
+            Direction::South => self.y += 1,
+            Direction::East => self.x += 1,
+            Direction::West => self.x -= 1,
         }
     }
 }
