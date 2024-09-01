@@ -85,4 +85,8 @@ impl Point {
     pub fn orthogonal_neighbours(&self) -> Vec<Point> {
         Direction::all().iter().map(|d| *self + *d).collect()
     }
+
+    pub fn orthogonal_distance(&self, p: &Point) -> u32 {
+        self.x.abs_diff(p.x) + self.y.abs_diff(p.y)
+    }
 }
