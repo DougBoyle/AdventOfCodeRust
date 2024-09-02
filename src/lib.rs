@@ -1,11 +1,11 @@
 
 use std::{
-    fs::File,
-    io::{BufRead, BufReader}
+    collections::VecDeque, fs::File, io::{BufRead, BufReader}
 };
 
 pub mod point;
 pub mod direction;
+pub mod grid;
 
 use point::Point;
 
@@ -32,4 +32,24 @@ pub fn assert_single<T, I: Iterator<Item=T>>(it: I) -> T {
     let items: Vec<_> = it.collect();
     assert!(items.len() == 1);
     items.into_iter().next().unwrap()
+}
+
+pub trait BreadthFirstSearch<Node> : Sized {
+    /// Returns true if state was updated i.e. the node was not already marked
+    fn mark(&mut self, node: &Node) -> bool;
+    fn neighbours(&self, node: &Node) -> Vec<Node>;
+
+    fn search(mut self, start: Node) {
+        let mut to_process = VecDeque::new();
+
+        // begin in a clean state, so 'start' should not already be marked
+        assert!(self.mark(&start));
+        to_process.push_back(start);
+
+        while let Some(node) = to_process.pop_front() {
+            for next in self.neighbours(&node) {
+                if self.mark(&next) { to_process.push_back(next) }
+            }
+        }
+    }
 }

@@ -1,6 +1,6 @@
-use std::{collections::{HashSet, VecDeque}, io::{Error, ErrorKind}, ops::{Index, IndexMut}};
+use std::{collections::HashSet, io::{Error, ErrorKind}};
 
-use rust_aoc::{direction::Direction, point::Point};
+use rust_aoc::{direction::Direction, point::Point, BreadthFirstSearch};
 
 fn main() {
     let layout: Vec<Vec<TileKind>> = rust_aoc::read_input(16)
@@ -27,74 +27,33 @@ fn main() {
     println!("Part 2: Maximum: {maximum}"); // 8183
 }
 
+struct EnergizedSearch<'a> {
+    grid: &'a mut Grid,
+}
+
+impl rust_aoc::BreadthFirstSearch<(Point, Direction)> for EnergizedSearch<'_> {
+    fn mark(&mut self, (p, dir): &(Point, Direction)) -> bool {
+        self.grid[p].energized_directions.insert(*dir)
+    }
+
+    fn neighbours(&self, (p, dir): &(Point, Direction)) -> Vec<(Point, Direction)> {
+        self.grid[p].kind.get_next_dirs(*dir).into_iter()
+            .map(|next_dir| (*p + next_dir, next_dir))
+            .filter(|(p, _)| self.grid.is_in_bounds(p))
+            .collect()
+    }
+}
+
 fn count_energized(start: Point, start_dir: Direction, layout: &Vec<Vec<TileKind>>) -> usize {
     let mut grid: Grid = layout.iter()
         .map(|row| row.iter().map(|kind| Cell::new(*kind)).collect())
         .collect();
-
-    let mut to_process = VecDeque::new();
-    grid[&start].energized_directions.insert(start_dir);
-    to_process.push_back((start, start_dir));
-
-    // TODO: Split out as a function?
-    while let Some((p, dir)) = to_process.pop_front() {
-        for next_dir in grid[&p].kind.get_next_dirs(dir) {
-            let next_point = p + next_dir;
-            if grid.is_in_bounds(&next_point) {
-                let existing_directions = &mut grid[&next_point].energized_directions;
-                if !existing_directions.contains(&next_dir) {
-                    existing_directions.insert(next_dir);
-                    to_process.push_back((next_point, next_dir));
-                }
-            }
-        }
-    }
-
+    let search = EnergizedSearch { grid: &mut grid };
+    search.search((start, start_dir));
     grid.iter().filter(|cell| !cell.energized_directions.is_empty()).count()
 }
 
-// TODO: Create a class for this
-struct Grid {
-    cells: Vec<Vec<Cell>>,
-    width: i32,
-    height: i32,
-}
-
-impl Grid {
-    fn new(cells: Vec<Vec<Cell>>) -> Grid {
-        let width = cells[0].len();
-        let height = cells.len();
-        Grid { cells, width: width as i32, height: height as i32 }
-    }
-
-    fn is_in_bounds(&self, &Point { x, y }: &Point) -> bool {
-        x >= 0 && y >= 0 && x < self.width && y < self.height
-    }
-
-    fn iter(&self) -> impl Iterator<Item=&Cell> {
-        self.cells.iter().flat_map(|row| row.iter())
-    }
-}
-
-impl Index<&Point> for Grid {
-    type Output = Cell;
-
-    fn index(&self, point: &Point) -> &Self::Output {
-        &self.cells[point.y as usize][point.x as usize]
-    }
-}
-
-impl IndexMut<&Point> for Grid {
-    fn index_mut(&mut self, point: &Point) -> &mut Self::Output {
-        &mut self.cells[point.y as usize][point.x as usize]
-    }
-}
-
-impl FromIterator<Vec<Cell>> for Grid {
-    fn from_iter<T: IntoIterator<Item = Vec<Cell>>>(iter: T) -> Self {
-        Grid::new(iter.into_iter().collect())
-    }
-}
+type Grid = rust_aoc::grid::Grid<Cell>;
 
 struct Cell {
     kind: TileKind,
