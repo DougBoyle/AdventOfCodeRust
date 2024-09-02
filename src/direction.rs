@@ -1,7 +1,7 @@
 use std::{io::{Error, ErrorKind}, ops::{Add, AddAssign}};
 use crate::point::Point;
 
-#[derive(Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Debug, Hash)]
 pub enum Direction {
     North,
     East,
