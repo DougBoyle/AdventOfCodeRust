@@ -1,6 +1,6 @@
 
 use std::{
-    collections::VecDeque, fs::File, io::{BufRead, BufReader}
+    collections::{BinaryHeap, VecDeque}, fs::File, io::{BufRead, BufReader}
 };
 
 pub mod point;
@@ -55,3 +55,60 @@ pub trait BreadthFirstSearch : Sized {
         }
     }
 }
+
+pub trait Dijkstra: Sized {
+    type State;
+
+    fn is_end(&self, state: &Self::State) -> bool;
+
+    fn neighbours(&self, value: &Self::State) -> Vec<(usize, Self::State)>;
+
+    fn try_improve(&mut self, state: &Self::State, cost: usize) -> bool;
+
+    fn search(mut self, starts: Vec<Self::State>) -> usize {
+        let mut to_explore: BinaryHeap<DijkstraCost<Self::State>> = BinaryHeap::new();
+        for start in starts {
+            to_explore.push(DijkstraCost {value: start, cost: 0});
+        }
+
+        loop {
+            let DijkstraCost { cost, value } = to_explore.pop().unwrap();
+            if self.is_end(&value) { return cost }
+
+            for (added_cost, new_value) in self.neighbours(&value) {
+                let new_cost = cost + added_cost;
+                if self.try_improve(&new_value, new_cost) {
+                    to_explore.push(DijkstraCost { cost: new_cost, value: new_value });
+                }
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+struct DijkstraCost<T> {
+    value: T,
+    cost: usize
+}
+
+/// Reversed ordering so that BinaryHeap results in a min heap, not max heap.
+/// DijkstraCost struct only used for BinaryHeap ordering, not public, hence ignores actual value for comparison.
+impl<T> Ord for DijkstraCost<T> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        other.cost.cmp(&self.cost)
+    }
+}
+
+impl<T> PartialOrd for DijkstraCost<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<T> PartialEq for DijkstraCost<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.cost == other.cost
+    }
+}
+
+impl<T> Eq for DijkstraCost<T> {}
