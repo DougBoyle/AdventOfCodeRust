@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BinaryHeap, HashMap};
+use std::collections::{BinaryHeap, HashMap};
 
 use rust_aoc::{direction::Direction, grid::Grid, point::Point};
 
@@ -43,7 +43,7 @@ struct GridSearch<'a> {
     // Point + Direction => Steps => Cost
     // A state is an improvement if, for that point, for its number of steps and all below it,
     // none of them have a better cost.
-    state_upper_bounds: HashMap<(Point, Direction), BTreeMap<usize, usize>>,
+    state_upper_bounds: HashMap<Crucible, usize>,
     constraints: Constraints,
 }
 
@@ -56,10 +56,11 @@ impl GridSearch<'_> {
         }
 
         loop {
-            let node = to_explore.pop().unwrap();
-            if is_end(&node.value) { return node.cost }
+            let Costed { cost, value } = to_explore.pop().unwrap();
+            if is_end(&value) { return cost }
 
-            for new_node in node.neighbours(&self.constraints, &self.tiles) {
+            for (added_cost, new_value) in self.neighbours(&value) {
+                let new_node = Costed { cost: cost + added_cost, value: new_value };
                 if self.try_improve(&new_node) {
                     to_explore.push(new_node);
                 }
@@ -67,77 +68,73 @@ impl GridSearch<'_> {
         }
     }
 
-    fn try_improve(&mut self, &Costed { cost, value: Crucible { point, last_dir, steps }}: &Costed<Crucible>) -> bool {
-        let costs_for_steps = self.state_upper_bounds.entry((point, last_dir))
-            .or_insert_with(|| BTreeMap::new());
-        // TODO: Allowing any shorter step no longer works once lower bound introduced?
- //       for (_, &existing_cost) in costs_for_steps.range(0..=steps) {
-        if let Some(&existing_cost) = costs_for_steps.get(&steps) {
-            if existing_cost <= cost { return false }
+    fn try_improve(&mut self, &Costed { cost, value }: &Costed<Crucible>) -> bool {
+        match self.state_upper_bounds.get_mut(&value) {
+            Some(existing_cost) => {
+                if *existing_cost > cost {
+                    *existing_cost = cost;
+                    true
+                } else {
+                    false
+                }
+            },
+            None => {
+                self.state_upper_bounds.insert(value, cost);
+                true
+            }
         }
-        costs_for_steps.insert(steps, cost);
-        true
     }
-}
 
-impl Costed<Crucible> {
-    fn neighbours(&self, constraints: &Constraints, tiles: &Grid<usize>) -> Vec<Costed<Crucible>> {
-        let &Costed { cost, value: Crucible { point, last_dir, steps } } = self;
+    fn neighbours(&self, value: &Crucible) -> Vec<(usize, Crucible)> {
+        let &Crucible { point, last_dir, steps } = value;
         
         Direction::all().into_iter()
-            .filter(|d| *d != last_dir.opposite() && (*d == last_dir || steps >= constraints.min_steps))
+            .filter(|d| *d != last_dir.opposite() && (*d == last_dir || steps >= self.constraints.min_steps))
             .map(|d| Crucible {
                 point: point + d,
                  last_dir: d, 
                  steps: if last_dir == d { steps + 1 } else { 1 } 
                 })
-            .filter(|Crucible { point, steps, .. }| *steps <= constraints.max_steps && tiles.is_in_bounds(point) )
+            .filter(|Crucible { point, steps, .. }| *steps <= self.constraints.max_steps && self.tiles.is_in_bounds(point) )
             .map(|crucible| {
-                let added_cost = tiles[&crucible.point];
-                Costed { value: crucible, cost: cost + added_cost }
+                let cost = self.tiles[&crucible.point];
+                (cost, crucible)
             })
             .collect()
     }
 }
 
-#[derive(PartialEq, Eq, Debug)]
-struct Costed<T: Ord> {
+#[derive(Debug)]
+struct Costed<T> {
     value: T,
     cost: usize
 }
 
-/// Reversed ordering so that BinaryHeap results in a min heap, not max heap
-impl<T: Ord> Ord for Costed<T> {
+/// Reversed ordering so that BinaryHeap results in a min heap, not max heap.
+/// Costed struct only used for BinaryHeap ordering, hence ignores actual value for comparison.
+impl<T> Ord for Costed<T> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        other.cost.cmp(&self.cost).then_with(|| other.value.cmp(&self.value))
+        other.cost.cmp(&self.cost)
     }
 }
 
-impl<T: Ord> PartialOrd for Costed<T> {
+impl<T> PartialOrd for Costed<T> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-#[derive(PartialEq, Eq, Debug, Clone, Copy)]
+impl<T> PartialEq for Costed<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.cost == other.cost
+    }
+}
+
+impl<T> Eq for Costed<T> {}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 struct Crucible {
     point: Point,
     last_dir: Direction,
     steps: usize,
 }
-
-impl Ord for Crucible {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.steps.cmp(&other.steps)
-            .then_with(|| self.point.cmp(&other.point))
-            .then_with(|| self.last_dir.cmp(&other.last_dir))
-    }
-}
-
-impl PartialOrd for Crucible {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-
