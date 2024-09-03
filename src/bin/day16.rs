@@ -31,7 +31,9 @@ struct EnergizedSearch<'a> {
     grid: &'a mut Grid,
 }
 
-impl rust_aoc::BreadthFirstSearch<(Point, Direction)> for EnergizedSearch<'_> {
+impl rust_aoc::BreadthFirstSearch for EnergizedSearch<'_> {
+    type Node = (Point, Direction);
+
     fn mark(&mut self, (p, dir): &(Point, Direction)) -> bool {
         self.grid[p].energized_directions.insert(*dir)
     }

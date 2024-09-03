@@ -6,7 +6,7 @@ type Cells = HashSet<Point>;
 fn main() {
     let mut cells = Cells::new();
     
-    rust_aoc::parse_grid(11, |p, c| { parse(p, c, &mut cells) });
+    rust_aoc::process_grid(11, |p, c| { parse(p, c, &mut cells) });
 
     let grid = Grid::new(cells);
 

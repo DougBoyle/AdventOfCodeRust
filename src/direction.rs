@@ -13,6 +13,15 @@ impl Direction {
     pub fn all() -> [Direction; 4] {
         [Direction::North, Direction::South, Direction::East, Direction::West]
     }
+
+    pub fn opposite(&self) -> Direction {
+        match &self {
+            Direction::North => Direction::South,
+            Direction::South => Direction::North,
+            Direction::East => Direction::West,
+            Direction::West => Direction::East,
+        }
+    }
 }
 
 impl Add<Direction> for Point {

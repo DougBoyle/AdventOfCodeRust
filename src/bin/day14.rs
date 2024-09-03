@@ -28,7 +28,7 @@ trait Part {
         let mut width = 0;
         let mut height = 0;
         let mut cells = Cells::new();
-        rust_aoc::parse_grid(14, |p, c| {
+        rust_aoc::process_grid(14, |p, c| {
             width = max(width, p.x+1);
             height = max(height, p.y+1);
             parse(p, c, &mut cells);

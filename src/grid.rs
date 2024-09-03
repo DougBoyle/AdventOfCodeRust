@@ -4,8 +4,8 @@ use crate::point::Point;
 
 pub struct Grid<T> {
     cells: Vec<Vec<T>>,
-    width: i32,
-    height: i32,
+    pub width: i32,
+    pub height: i32,
 }
 
 impl<T> Grid<T> {
@@ -13,6 +13,10 @@ impl<T> Grid<T> {
         let width = cells[0].len();
         let height = cells.len();
         Grid { cells, width: width as i32, height: height as i32 }
+    }
+
+    pub fn parse<F: FnMut(char) -> T>(lines: impl Iterator<Item=String>, mut f: F) -> Self {
+        Self::new(lines.map(|line| line.chars().map(|c| f(c)).collect()).collect())
     }
 
     pub fn is_in_bounds(&self, &Point { x, y }: &Point) -> bool {

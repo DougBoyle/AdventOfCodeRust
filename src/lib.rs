@@ -16,7 +16,7 @@ pub fn read_input(day: u32) -> impl Iterator<Item=String> {
 }
 
 /// f(point, character) for each cell of the grid, with the first character in the top left being Point { x: 0, y: 0 }
-pub fn parse_grid<F: FnMut(Point, char)>(day: u32, mut f: F) {
+pub fn process_grid<F: FnMut(Point, char)>(day: u32, mut f: F) {
     read_input(day).enumerate().for_each(|(y, line)| line.chars().enumerate().for_each(|(x, c)|
         f(Point { x: x.try_into().unwrap(), y: y.try_into().unwrap() }, c)
     ));
@@ -34,12 +34,14 @@ pub fn assert_single<T, I: Iterator<Item=T>>(it: I) -> T {
     items.into_iter().next().unwrap()
 }
 
-pub trait BreadthFirstSearch<Node> : Sized {
-    /// Returns true if state was updated i.e. the node was not already marked
-    fn mark(&mut self, node: &Node) -> bool;
-    fn neighbours(&self, node: &Node) -> Vec<Node>;
+pub trait BreadthFirstSearch : Sized {
+    type Node;
 
-    fn search(mut self, start: Node) {
+    /// Returns true if state was updated i.e. the node was not already marked
+    fn mark(&mut self, node: &Self::Node) -> bool;
+    fn neighbours(&self, node: &Self::Node) -> Vec<Self::Node>;
+
+    fn search(mut self, start: Self::Node) {
         let mut to_process = VecDeque::new();
 
         // begin in a clean state, so 'start' should not already be marked

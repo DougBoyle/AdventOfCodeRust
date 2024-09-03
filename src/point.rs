@@ -1,6 +1,6 @@
 use crate::direction::Direction;
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Hash, Debug)]
 pub struct Point { pub x: i32, pub y: i32 }
 
 impl std::ops::Add for Point {
