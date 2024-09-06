@@ -39,11 +39,19 @@ impl std::fmt::Display for Point {
     }
 }
 
+impl std::ops::Mul<i32> for Point {
+    type Output = Point;
+    fn mul(self, c: i32) -> Self::Output {
+        let Point { x, y } = self;
+        Point { x: x*c, y: y*c }
+    }
+}
+
 struct PointIterator { start: Point, end: Point, incr: Point, inclusive_end: bool }
 
 impl PointIterator {
     fn new(start: Point, end: Point, inclusive_end: bool) -> PointIterator {
-        if start.x != end.x && start.y != end.y {
+        if !start.is_orthogonal_to(&end) {
             panic!("Cannot iterate between {start} and {end}");
         }
         let incr = if start.x < end.x { Point { x:1, y:0 } }
@@ -88,5 +96,9 @@ impl Point {
 
     pub fn orthogonal_distance(&self, p: &Point) -> u32 {
         self.x.abs_diff(p.x) + self.y.abs_diff(p.y)
+    }
+
+    pub fn is_orthogonal_to(&self, p: &Point) -> bool {
+        self.x == p.x || self.y == p.y
     }
 }

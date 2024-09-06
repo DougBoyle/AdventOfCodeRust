@@ -112,3 +112,62 @@ impl<T> PartialEq for DijkstraCost<T> {
 }
 
 impl<T> Eq for DijkstraCost<T> {}
+
+
+/// Shoelace formula and Pick's theorem:
+/// Shoelace formula (https://en.wikipedia.org/wiki/Shoelace_formula) - For a shape defined by a sequence of corners 
+///   (positively oriented i.e. going counter clockwise), the area is the sum of 1/2 (x_i - x_{i+1})(y_i + y_{i+1}).
+///   This can be demonstrated by adding/subtracting trapezoids, with the other two points on the x-axis, as the area
+///   of the trapezoid [(x1, 0), (x1, y1), (x2, y2), (x2, 0)] is (x2 - x1)(0.5(y1 + y2)) i.e. base * average height.
+///   It can also be viewed as many triangles, with the third point at the origin. Either way, it can be simplified to
+///   0.5 * Sum { x_i ( y_{i+1} - y_{i-1} ) }   (wrapping around where necessary)
+/// Pick's theorem (https://en.wikipedia.org/wiki/Pick%27s_theorem) - The area of a "simple" polygon with integer coordinate vertices is
+///   A = i + b/2 - 1, where A=area, i=number of integer coordinates inside the shape, b=integer points along bounary (i.e. edges/corners).
+/// 
+/// Combining the two:
+///   Both problems are described in terms of points that make up the boundary of a shape. If instead we're thinking of each point as a "cell",
+///   then the shape [(0,0), (0,1), (1,1), (1,0)] has an area of 4 rather than 1. To solve this discrepancy, think of each point as being the
+///   center of that cell:
+/// +------+------+ <-- corner of "cell", unrelated to interior/boundary points. We want the area of this outer shape = number of cells = 4
+/// |      |      |
+/// |  *---|---*  | <-- boundary "point" (1,1) in center of cell, Shoelace formula/Pick's theorem give the area of this inner shape = 1
+/// |  |   |   |  |
+/// +------+------+
+/// |  |   |   |  |
+/// |  *---|---*  |
+/// |      |      |
+/// +------+------+
+///   The Shoelace formula and Pick's theorem describe the same area A = the inner area of the shape outlined by the center points,
+///   with the Shoelace formula being the easier way of calculating that. The number of cells is really just the number of "interior"
+///   and "boundary" points as describe in Pick's theorem i.e. counting the number of cell centers, with all 4 points in the 2x2 example
+///   above being boundary points, and the actual borders of the "cells" having nothing to do with interior/boundary points.
+/// We want Number of Cells = i + b
+/// A = Area of the shape bounded by the cell centers, gotten from the Shoelace formula.
+/// b = Boundary points = number of cells on the perimeter, easy to count from the description of the shape's border cells.
+/// Pick's theorem: A = i + b/2 - 1      =>      i = A - b/2 + 1
+/// Therefore: Number of Cells = i + b = (A - b/2 + 1) + b = A + b/2 + 1
+/// Hence to go from Shoelace formula result to number of cells, just add (cells on perimeter / 2 + 1)
+fn shoelace_area_from_boundary_points(points: &Vec<Point>) -> i64 {
+    let len = points.len();
+    let total: i64 = (0..len).map(|i| {
+        let p = points[i];
+        let previous = points[(i + len - 1) % len];
+        let next = points[(i + 1) % len];
+        (p.x as i64) * ((next.y - previous.y) as i64)
+    }).sum();
+    let total = total / 2;
+    // rather than enforcing the correct orientation, just flip sign if end result is negative
+    if total < 0 { -total } else { total }
+}
+
+pub fn shoelace_area_enclosed_cells_including_border(perimeter_cells: &Vec<Point>) -> i64 {
+    let len = perimeter_cells.len();
+    let perimeter_len: u32 = (0..len).map(|i| {
+        let p1 = &perimeter_cells[i];
+        let p2 = &perimeter_cells[(i+1) % len];
+        if !p1.is_orthogonal_to(p2) { panic!("Invalid cell outline, not grid aligned!") }
+        p1.orthogonal_distance(p2)
+    }).sum();
+    let perimeter_len = perimeter_len as i64;
+    shoelace_area_from_boundary_points(perimeter_cells) + (perimeter_len/2) + 1
+}
