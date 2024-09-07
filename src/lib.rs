@@ -171,3 +171,5 @@ pub fn shoelace_area_enclosed_cells_including_border(perimeter_cells: &Vec<Point
     let perimeter_len = perimeter_len as i64;
     shoelace_area_from_boundary_points(perimeter_cells) + (perimeter_len/2) + 1
 }
+
+// TODO: Add a more generic topological sort algorithm
