@@ -1,6 +1,7 @@
 use std::{cmp::{max, min}, collections::HashMap, io::{Error, ErrorKind}, ops::{Deref, DerefMut, Range}, str::FromStr};
 
 use enum_map::{Enum, EnumMap};
+use rust_aoc::TopologicalSort;
 
 fn main() {
     let mut lines = rust_aoc::read_input(19);
@@ -14,7 +15,7 @@ fn main() {
         .map(|part| part.sum_value()).sum();
     println!("Part 1: Total {total}"); // 319062
 
-    let sorted = topological_sort(&workflows);
+    let sorted = WorkflowTopologicalSort { workflows: &workflows }.sort();
     let sorted = if let Ok(sorted) = sorted { sorted } else { panic!("Not a DAG") };
 
     // Calculate in reverse DAG order
@@ -59,49 +60,22 @@ fn process(part: &Part, workflows: &HashMap<String, Workflow>) -> bool {
     }
 }
 
-struct GraphContainsCycleError;
+struct WorkflowTopologicalSort<'a> {
+    workflows: &'a HashMap<String, Workflow>,
+}
 
-fn topological_sort(workflows: &HashMap<String, Workflow>) -> Result<Vec<String>, GraphContainsCycleError> {
-    let mut reverse_sorted = Vec::new();
-    let mut nodes_visited = HashMap::new(); // Empty = not seen, 0 = to visit, 1 = visiting, 2 = visited
+impl TopologicalSort for WorkflowTopologicalSort<'_> {
+    type Node = String;
 
-    for node in workflows.keys() {
-        if reverse_sorted.contains(node) { continue; }
-
-        nodes_visited.insert(node.clone(), 0);
-        let mut stack = vec![node.clone()];
-        
-        while let Some(node) = stack.pop() {
-            match nodes_visited.get_mut(&node) {
-                Some(v @ 0) => {
-                    let downstream = workflows.get(&node).unwrap().downstream_nodes();
-                    *v = 1;
-                    stack.push(node);
-                    for next in downstream {
-                        if next == "A" || next == "R" { continue }
-                        match nodes_visited.get(&next) {
-                            None => {
-                                nodes_visited.insert(next.clone(), 0);
-                                stack.push(next)
-                            },
-                            Some(0) => stack.push(next), // DFS found it via a different branch higher up too, eagerly explore
-                            Some(1) => return Err(GraphContainsCycleError),
-                            Some(2) => {},
-                            _ => panic!("Bug, unexpected state")
-                        }
-                    }
-                },
-                Some(v @ 1) => {
-                    *v = 2;
-                    reverse_sorted.push(node);
-                },
-                Some(2) => {}, // already explored down some other branch
-                _ => panic!("Bug, stack contains a node in unexpected state")
-            }
-        }
+    fn get_all_nodes(&self) -> Vec<Self::Node> {
+        self.workflows.keys().cloned().collect()
     }
-    reverse_sorted.reverse();
-    Ok(reverse_sorted)
+
+    fn get_edges(&self, node: &Self::Node) -> Vec<Self::Node> {
+        self.workflows.get(node).unwrap().downstream_nodes().into_iter()
+            .filter(|node| node != "A" && node != "R")
+            .collect()
+    }
 }
 
 const MIN_INCLUSIVE: i32 = 1;

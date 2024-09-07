@@ -1,6 +1,6 @@
 
 use std::{
-    collections::{BinaryHeap, VecDeque}, fs::File, io::{BufRead, BufReader}
+    collections::{BinaryHeap, HashMap, VecDeque}, fs::File, io::{BufRead, BufReader}
 };
 
 pub mod point;
@@ -112,6 +112,60 @@ impl<T> PartialEq for DijkstraCost<T> {
 }
 
 impl<T> Eq for DijkstraCost<T> {}
+
+
+pub struct GraphContainsCycleError;
+
+pub trait TopologicalSort {
+    type Node: std::hash::Hash + Eq + Clone; // TODO: See if possible to remove Clone, by instead storing references?
+
+    fn get_all_nodes(&self) -> Vec<Self::Node>;
+    fn get_edges(&self, node: &Self::Node) -> Vec<Self::Node>;
+
+    fn sort(&mut self) -> Result<Vec<Self::Node>, GraphContainsCycleError> {
+        let mut reverse_sorted = Vec::new();
+        let mut nodes_seen = HashMap::new();
+    
+        for node in self.get_all_nodes() {
+            if let Some(TopologicalSortState::Visited) = nodes_seen.get(&node) { continue; }
+    
+            nodes_seen.insert(node.clone(), TopologicalSortState::ToVisit);
+            let mut stack = vec![node.clone()];
+            
+            while let Some(node) = stack.pop() {
+                match nodes_seen.get_mut(&node) {
+                    Some(state @ TopologicalSortState::ToVisit) => {
+                        *state = TopologicalSortState::Visiting;
+                        let edges = self.get_edges(&node);
+                        stack.push(node);
+                        for next in edges {
+                            match nodes_seen.get(&next) {
+                                None => {
+                                    nodes_seen.insert(next.clone(), TopologicalSortState::ToVisit);
+                                    stack.push(next)
+                                },
+                                Some(TopologicalSortState::ToVisit) => stack.push(next), // DFS found it via a different branch higher up too, eagerly explore
+                                Some(TopologicalSortState::Visiting) => return Err(GraphContainsCycleError),
+                                Some(TopologicalSortState::Visited) => {},
+                            }
+                        }
+                    },
+                    Some(state @ TopologicalSortState::Visiting) => {
+                        *state = TopologicalSortState::Visited;
+                        reverse_sorted.push(node);
+                    },
+                    Some(TopologicalSortState::Visited) => {}, // already explored down some other branch
+                    None => panic!("Bug, stack contains a node, but no state recorded for it in nodes_seen")
+                }
+            }
+        }
+        reverse_sorted.reverse();
+        Ok(reverse_sorted)
+    }
+}
+
+// Not public, internal state tracking for topological sort
+enum TopologicalSortState { ToVisit, Visiting, Visited }
 
 
 /// Shoelace formula and Pick's theorem:
