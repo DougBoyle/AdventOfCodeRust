@@ -15,21 +15,22 @@ fn main() {
         .map(|part| part.sum_value()).sum();
     println!("Part 1: Total {total}"); // 319062
 
-    let sorted = WorkflowTopologicalSort { workflows: &workflows }.sort();
+    let mut sort = WorkflowTopologicalSort { workflows: &workflows };
+    let sorted = sort.sort();
     let sorted = if let Ok(sorted) = sorted { sorted } else { panic!("Not a DAG") };
 
     // Calculate in reverse DAG order
-    let mut accepted_ranges: HashMap<String, PartRange> = HashMap::new();
-    accepted_ranges.insert(String::from("A"), PartRange::all());
+    let mut accepted_ranges: HashMap<&str, PartRange> = HashMap::new();
+    accepted_ranges.insert("A", PartRange::all());
     
 
     for id in sorted.into_iter().rev() {
-        let rules = &workflows.get(&id).unwrap().rules;
+        let rules = &workflows.get(id).unwrap().rules;
         let mut previous_rules = PartRange::all(); // subtractive, constrained as we get further down non-matching rules
         let mut overall_range = PartRange::none(); // additive, paths via each rule
         for rule in rules {
             let destination = rule.destination();
-            if let Some(destination_range) = accepted_ranges.get(destination) {
+            if let Some(destination_range) = accepted_ranges.get(&destination[..]) {
                 let rule_range = rule.requirements();
                 let previous_and_this_rule_range = previous_rules.intersect(&rule_range);
                 let matching_range = previous_and_this_rule_range.intersect(destination_range);
@@ -67,13 +68,13 @@ struct WorkflowTopologicalSort<'a> {
 impl TopologicalSort for WorkflowTopologicalSort<'_> {
     type Node = String;
 
-    fn get_all_nodes(&self) -> Vec<Self::Node> {
-        self.workflows.keys().cloned().collect()
+    fn get_all_nodes(&self) -> Vec<&Self::Node> {
+        self.workflows.keys().collect()
     }
 
-    fn get_edges(&self, node: &Self::Node) -> Vec<Self::Node> {
+    fn get_edges(&self, node: &Self::Node) -> Vec<&Self::Node> {
         self.workflows.get(node).unwrap().downstream_nodes().into_iter()
-            .filter(|node| node != "A" && node != "R")
+            .filter(|node| *node != "A" && *node != "R")
             .collect()
     }
 }
@@ -273,8 +274,8 @@ impl Workflow {
         self.rules.iter().filter(|rule| rule.matches(part)).next().unwrap().destination()
     }
 
-    fn downstream_nodes(&self) -> Vec<String> {
-        self.rules.iter().map(|rule| rule.destination().clone()).collect()
+    fn downstream_nodes(&self) -> Vec<&String> {
+        self.rules.iter().map(|rule| rule.destination()).collect()
     }
 
     // TODO: Move from main loop to here?

@@ -117,31 +117,31 @@ impl<T> Eq for DijkstraCost<T> {}
 pub struct GraphContainsCycleError;
 
 pub trait TopologicalSort {
-    type Node: std::hash::Hash + Eq + Clone; // TODO: See if possible to remove Clone, by instead storing references?
+    type Node: std::hash::Hash + Eq;
 
-    fn get_all_nodes(&self) -> Vec<Self::Node>;
-    fn get_edges(&self, node: &Self::Node) -> Vec<Self::Node>;
+    fn get_all_nodes(&self) -> Vec<&Self::Node>;
+    fn get_edges(&self, node: &Self::Node) -> Vec<&Self::Node>;
 
-    fn sort(&mut self) -> Result<Vec<Self::Node>, GraphContainsCycleError> {
+    fn sort(&mut self) -> Result<Vec<&Self::Node>, GraphContainsCycleError> {
         let mut reverse_sorted = Vec::new();
         let mut nodes_seen = HashMap::new();
     
         for node in self.get_all_nodes() {
-            if let Some(TopologicalSortState::Visited) = nodes_seen.get(&node) { continue; }
+            if let Some(TopologicalSortState::Visited) = nodes_seen.get(node) { continue; }
     
-            nodes_seen.insert(node.clone(), TopologicalSortState::ToVisit);
-            let mut stack = vec![node.clone()];
+            nodes_seen.insert(node, TopologicalSortState::ToVisit);
+            let mut stack = vec![node];
             
             while let Some(node) = stack.pop() {
                 match nodes_seen.get_mut(&node) {
                     Some(state @ TopologicalSortState::ToVisit) => {
                         *state = TopologicalSortState::Visiting;
-                        let edges = self.get_edges(&node);
+                        let edges = self.get_edges(node);
                         stack.push(node);
                         for next in edges {
-                            match nodes_seen.get(&next) {
+                            match nodes_seen.get(next) {
                                 None => {
-                                    nodes_seen.insert(next.clone(), TopologicalSortState::ToVisit);
+                                    nodes_seen.insert(next, TopologicalSortState::ToVisit);
                                     stack.push(next)
                                 },
                                 Some(TopologicalSortState::ToVisit) => stack.push(next), // DFS found it via a different branch higher up too, eagerly explore
