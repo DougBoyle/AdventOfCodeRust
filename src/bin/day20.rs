@@ -27,34 +27,15 @@ fn part2() {
     let graph = Machine::parse();
 
     // try to simplify by walking back
-    let rx = &graph["rx"]; // want to see it receive low
-    let to_rx = &rx.input_modules;
-    println!("{to_rx:?} feeds into {}", rx.id);
-
-    let to_rx: Vec<_> = to_rx.iter().map(|id| &graph[id]).collect();
-    println!("{} feeds into {rx}", to_rx.iter().map(|node| node.to_string()).collect::<Vec<_>>().join(", "));
-
-    if to_rx.len() != 1 || to_rx[0].module_type != ModuleType::Conjunction {
-        panic!("Expected one Conjunction input to rx");
-    }
-
     // dh -> rx, want to see dh emit a low signal => everything feeding into dh emits high
-    let dh = to_rx[0];
-    let to_dh = &dh.input_modules;
-    println!("{to_dh:?} feeds into {}", dh.id);
-
-    let to_dh: Vec<_> = to_dh.iter().map(|id| &graph[id]).collect();
-    println!("L2 {} feeds into {dh}", to_dh.iter().map(|node| node.to_string()).collect::<Vec<_>>().join(", "));
-
-    if to_dh.len() != 4 || to_dh.iter().any(|module| module.module_type != ModuleType::Conjunction) {
-        panic!("Expected 4 Conjunction inputs to dh");
-    }
-
+    let dh = get_rx_input(&graph);
 
     // tr, xm, dr, nh -> dh, all Conjuntions.
     // Want all of those to emit high => at least one node before each of them emits low
+    let l2s = get_l2_inputs(&graph, &dh);
+
     let mut all_l3s = vec![];
-    for l2 in to_dh {
+    for l2 in l2s {
         let l3s = &l2.input_modules;
         println!("{l3s:?} feeds into {}", l2.id);
     
@@ -152,6 +133,40 @@ fn part2_alt() {
     let graph = Machine::parse();
 
     // try to simplify by walking back
+
+     // dh -> rx, want to see dh emit a low signal => everything feeding into dh emits high
+    let dh = get_rx_input(&graph);
+    
+    // tr, xm, dr, nh -> dh, all Conjuntions.
+    // Want all of those to emit high => at least one node before each of them emits low
+    let l2s = get_l2_inputs(&graph, &dh);
+
+    // Record whenever those modules emit High
+    for l2 in &l2s {
+        (*machine.modules[&l2.id]).borrow_mut().get_base_module_mut().track_high_output = true;
+    }
+
+    let mut i = 0;
+    let start = Instant::now();
+    while !machine.all_outputs_registered(1) {
+        i += 1;
+        machine.press();
+        if i % 1_000_000 == 0 { println!("Press {}m, t={}s", i/1_000_000, (Instant::now() - start).as_secs()); }
+    }
+    println!("Complete after {i} presses");
+
+    let cycles: Vec<_> = l2s.iter().map(|l2| {
+        let module = (*machine.modules[&l2.id]).borrow();
+        let base_mod = module.get_base_module();
+        println!("{} - {:?}", base_mod.id, base_mod.high_press_and_cycle);
+        base_mod.high_press_and_cycle[0].0
+    }).collect();
+    println!("Cycles: {:?}", cycles);
+    println!("LCM: {}", cycles.iter().map(|n| *n as u64).reduce(|n, m| num::integer::lcm(n, m)).unwrap()); // 207652583562007
+}
+
+// Only one Conjunction before rx, care about when it emits low
+fn get_rx_input(graph: &HashMap<String, ParsedModule>) -> &ParsedModule {
     let rx = &graph["rx"]; // want to see it receive low
     let to_rx = &rx.input_modules;
     println!("{to_rx:?} feeds into {}", rx.id);
@@ -165,44 +180,21 @@ fn part2_alt() {
 
     // dh -> rx, want to see dh emit a low signal => everything feeding into dh emits high
     let dh = to_rx[0];
-    let to_dh = &dh.input_modules;
-    println!("{to_dh:?} feeds into {}", dh.id);
+    dh
+}
 
-    let to_dh: Vec<_> = to_dh.iter().map(|id| &graph[id]).collect();
-    println!("L2 {} feeds into {dh}", to_dh.iter().map(|node| node.to_string()).collect::<Vec<_>>().join(", "));
+// tr, xm, dr, nh -> dh, all Conjuntions.
+// dh emits low => want all of these L2 nodes to emit high => at least one node before each of them emits low
+fn get_l2_inputs<'a>(graph: &'a HashMap<String, ParsedModule>, l1: &ParsedModule) -> Vec<&'a ParsedModule> {
+    let l2s: Vec<_> = l1.input_modules.iter().map(|id| &graph[id]).collect();
+    println!("L2 {} feeds into {l1}", l2s.iter().map(|node| node.to_string()).collect::<Vec<_>>().join(", "));
 
-    if to_dh.len() != 4 || to_dh.iter().any(|module| module.module_type != ModuleType::Conjunction) {
+    if l2s.len() != 4 || l2s.iter().any(|module| module.module_type != ModuleType::Conjunction) {
         panic!("Expected 4 Conjunction inputs to dh");
     }
 
-
-    // tr, xm, dr, nh -> dh, all Conjuntions.
-    // Want all of those to emit high => at least one node before each of them emits low
-
-    // Record whenever those modules emit High
-    for l2 in &to_dh {
-        (*machine.modules[&l2.id]).borrow_mut().get_base_module_mut().track_high_output = true;
-    }
-
-    let mut i = 0;
-    let start = Instant::now();
-    while !machine.all_outputs_registered(1) {
-        i += 1;
-        machine.press();
-        if i % 1_000_000 == 0 { println!("Press {}m, t={}s", i/1_000_000, (Instant::now() - start).as_secs()); }
-    }
-    println!("Complete after {i} presses");
-
-    let cycles: Vec<_> = to_dh.iter().map(|l2| {
-        let module = (*machine.modules[&l2.id]).borrow();
-        let base_mod = module.get_base_module();
-        println!("{} - {:?}", base_mod.id, base_mod.high_press_and_cycle);
-        base_mod.high_press_and_cycle[0].0
-    }).collect();
-    println!("Cycles: {:?}", cycles);
-    println!("LCM: {}", cycles.iter().map(|n| *n as u64).reduce(|n, m| num::integer::lcm(n, m)).unwrap()); // 207652583562007
+    l2s
 }
-
 
 // Just unrolled directly in Machine::press
 // const BUTTON: &str = "button";
@@ -295,10 +287,6 @@ impl Machine {
         }
 
         (low_count, high_count)
-    }
-
-    fn received_low(&self) -> bool {
-        (*self.modules["rx"]).borrow().received_low()
     }
 
     fn all_outputs_registered(&self, count: usize) -> bool {
@@ -426,10 +414,6 @@ trait Module {
     fn process(&mut self, from: &str, pulse_type: PulseType) -> Option<PulseType>;
     fn get_base_module(&self) -> &BaseModule;
     fn get_base_module_mut(&mut self) -> &mut BaseModule;
-    
-    fn received_low(&self) -> bool {
-        false
-    }
 }
 
 struct BroadcastModule {
@@ -497,7 +481,7 @@ impl Module for FlipFlopModule {
         match pulse_type {
             PulseType::High => None,
             PulseType::Low  => {
-                let mut on = self.on.borrow_mut();
+                let on = self.on.borrow_mut();
                 *on = !*on;
                 Some(if *on { PulseType::High } else { PulseType::Low })
             }
@@ -515,16 +499,14 @@ impl Module for FlipFlopModule {
 
 struct ReceiverModule {
     base: BaseModule,
-    received_low: RefCell<bool>,
 }
 
 impl Module for ReceiverModule {
     fn new(base: BaseModule, _parsed: &ParsedModule) -> Self {
-        ReceiverModule { base, received_low: RefCell::new(false) }
+        ReceiverModule { base }
     }
 
-    fn process(&mut self, _from: &str, pulse_type: PulseType) -> Option<PulseType> {
-        if pulse_type == PulseType::Low { *self.received_low.borrow_mut() = true }
+    fn process(&mut self, _from: &str, _pulse_type: PulseType) -> Option<PulseType> {
         None
     }
 
@@ -534,10 +516,6 @@ impl Module for ReceiverModule {
 
     fn get_base_module_mut(&mut self) -> &mut BaseModule {
         &mut self.base
-    }
-
-    fn received_low(&self) -> bool {
-        *self.received_low.borrow()
     }
 }
 
