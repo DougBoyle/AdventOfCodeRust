@@ -114,7 +114,10 @@ impl<T> PartialEq for DijkstraCost<T> {
 impl<T> Eq for DijkstraCost<T> {}
 
 
-pub struct GraphContainsCycleError;
+pub struct GraphContainsCycleError<T> {
+    pub from: T,
+    pub to: T,
+}
 
 pub trait TopologicalSort {
     type Node: std::hash::Hash + Eq;
@@ -122,7 +125,7 @@ pub trait TopologicalSort {
     fn get_all_nodes(&self) -> Vec<&Self::Node>;
     fn get_edges(&self, node: &Self::Node) -> Vec<&Self::Node>;
 
-    fn sort(&mut self) -> Result<Vec<&Self::Node>, GraphContainsCycleError> {
+    fn sort(&mut self) -> Result<Vec<&Self::Node>, GraphContainsCycleError<&Self::Node>> {
         let mut reverse_sorted = Vec::new();
         let mut nodes_seen = HashMap::new();
     
@@ -145,7 +148,7 @@ pub trait TopologicalSort {
                                     stack.push(next)
                                 },
                                 Some(TopologicalSortState::ToVisit) => stack.push(next), // DFS found it via a different branch higher up too, eagerly explore
-                                Some(TopologicalSortState::Visiting) => return Err(GraphContainsCycleError),
+                                Some(TopologicalSortState::Visiting) => return Err(GraphContainsCycleError { from: node, to: next }),
                                 Some(TopologicalSortState::Visited) => {},
                             }
                         }
