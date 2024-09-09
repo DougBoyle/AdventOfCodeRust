@@ -26,6 +26,17 @@ impl<T> Grid<T> {
     pub fn iter(&self) -> impl Iterator<Item=&T> {
         self.cells.iter().flat_map(|row| row.iter())
     }
+
+    pub fn map<U, F: FnMut(Point, T) -> U>(self, mut f: F) -> Grid<U> {
+        Grid::new(self.cells.into_iter().enumerate()
+            .map(|(y, row)| row.into_iter().enumerate()
+                .map(|(x, val)| f(Point { x: x as i32, y: y as i32 }, val)).collect())
+            .collect())
+    }
+
+    pub fn get(&self, p: &Point) -> Option<&T> {
+        self.cells.get(p.y as usize).map(|row| row.get(p.x as usize)).flatten()
+    }
 }
 
 impl<T> Index<&Point> for Grid<T> {
