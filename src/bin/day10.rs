@@ -43,9 +43,9 @@ fn parse(point: Point, c: char, grid: &mut Grid, start: &mut Point) {
     }
 }
 
-fn count_enclosed_cells(loop_tiles: Vec<Tile>) -> i32 {
+fn count_enclosed_cells(loop_tiles: Vec<Tile>) -> i64 {
     // Strategy: Scan rows to work out how many tiles are 'inside' the loop
-    let mut pipes_by_row: BTreeMap<i32, BTreeMap<i32, Tile>> = BTreeMap::new();
+    let mut pipes_by_row: BTreeMap<i64, BTreeMap<i64, Tile>> = BTreeMap::new();
     for tile in loop_tiles {
         pipes_by_row.entry(tile.y).or_default().insert(tile.x, tile);
     }
@@ -73,7 +73,7 @@ fn count_enclosed_cells(loop_tiles: Vec<Tile>) -> i32 {
             } else {
                 0
             }
-        }).sum::<i32>()
+        }).sum::<i64>()
     }).sum()
 }
 

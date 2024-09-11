@@ -1,7 +1,7 @@
 use crate::direction::Direction;
 
 #[derive(Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Hash, Debug)]
-pub struct Point { pub x: i32, pub y: i32 }
+pub struct Point { pub x: i64, pub y: i64 }
 
 impl std::ops::Add for Point {
     type Output = Point;
@@ -39,9 +39,9 @@ impl std::fmt::Display for Point {
     }
 }
 
-impl std::ops::Mul<i32> for Point {
+impl std::ops::Mul<i64> for Point {
     type Output = Point;
-    fn mul(self, c: i32) -> Self::Output {
+    fn mul(self, c: i64) -> Self::Output {
         let Point { x, y } = self;
         Point { x: x*c, y: y*c }
     }
@@ -94,7 +94,7 @@ impl Point {
         Direction::all().iter().map(|d| *self + *d).collect()
     }
 
-    pub fn orthogonal_distance(&self, p: &Point) -> u32 {
+    pub fn orthogonal_distance(&self, p: &Point) -> u64 {
         self.x.abs_diff(p.x) + self.y.abs_diff(p.y)
     }
 

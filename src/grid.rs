@@ -4,15 +4,15 @@ use crate::point::Point;
 
 pub struct Grid<T> {
     cells: Vec<Vec<T>>,
-    pub width: i32,
-    pub height: i32,
+    pub width: i64,
+    pub height: i64,
 }
 
 impl<T> Grid<T> {
     pub fn new(cells: Vec<Vec<T>>) -> Self {
         let width = cells[0].len();
         let height = cells.len();
-        Grid { cells, width: width as i32, height: height as i32 }
+        Grid { cells, width: width as i64, height: height as i64 }
     }
 
     pub fn parse<F: FnMut(char) -> T>(lines: impl Iterator<Item=String>, mut f: F) -> Self {
@@ -34,7 +34,7 @@ impl<T> Grid<T> {
     pub fn enumerate(&self) -> impl Iterator<Item=(Point, &T)> {
         self.cells.iter().enumerate().flat_map(|(y, row)| 
             row.iter().enumerate().map(move |(x, value)| 
-                (Point { x: x as i32, y: y as i32 }, value)
+                (Point { x: x as i64, y: y as i64 }, value)
             )
         )
     }
@@ -42,7 +42,7 @@ impl<T> Grid<T> {
     pub fn map<U, F: FnMut(Point, T) -> U>(self, mut f: F) -> Grid<U> {
         Grid::new(self.cells.into_iter().enumerate()
             .map(|(y, row)| row.into_iter().enumerate()
-                .map(|(x, val)| f(Point { x: x as i32, y: y as i32 }, val)).collect())
+                .map(|(x, val)| f(Point { x: x as i64, y: y as i64 }, val)).collect())
             .collect())
     }
 

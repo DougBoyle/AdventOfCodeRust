@@ -132,7 +132,7 @@ fn corner_points(grid: &Grid<Cell>) -> [Point; 4] {
     ]
 }
 
-fn reachable_cells(start: &Point, grid: &Grid<Cell>, steps: i32) -> usize {
+fn reachable_cells(start: &Point, grid: &Grid<Cell>, steps: i64) -> usize {
     let mut positions = HashSet::new();
     positions.insert(*start);
     for _ in 0..steps {
@@ -141,7 +141,7 @@ fn reachable_cells(start: &Point, grid: &Grid<Cell>, steps: i32) -> usize {
     positions.len()
 }
 
-fn reachable_cells_at_each_point(start: &Point, grid: &Grid<Cell>, steps: Vec<i32>) -> Vec<usize> {
+fn reachable_cells_at_each_point(start: &Point, grid: &Grid<Cell>, steps: Vec<i64>) -> Vec<usize> {
     if !steps.windows(2).all(|values| values[0] < values[1]) { panic!("Out of order steps counts {steps:?}"); }
 
     let mut positions = HashSet::new();

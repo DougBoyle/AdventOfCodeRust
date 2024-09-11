@@ -21,7 +21,7 @@ trait Part {
         let empty_size_additional_factor = Self::empty_cell_size() - 1;
         let mut total_dist: usize = 0;
         for_each_pair(&grid.cells, |from, to| {
-            total_dist += <u32 as TryInto<usize>>::try_into(from.orthogonal_distance(to)).unwrap();
+            total_dist += <u64 as TryInto<usize>>::try_into(from.orthogonal_distance(to)).unwrap();
 
             let (xmin, xmax) = ordered(from.x, to.x); 
             let (ymin, ymax) = ordered(from.y, to.y);
@@ -56,8 +56,8 @@ fn parse(point: Point, c: char, grid: &mut Cells) {
 
 struct Grid {
     cells: Cells,
-    doubled_rows: BTreeSet<i32>,
-    doubled_cols: BTreeSet<i32>,
+    doubled_rows: BTreeSet<i64>,
+    doubled_cols: BTreeSet<i64>,
 }
 
 impl Grid {
@@ -66,8 +66,8 @@ impl Grid {
     fn new(cells: Cells) -> Grid {
         let x_max = cells.iter().map(|p| p.x).max().unwrap();
         let y_max = cells.iter().map(|p| p.y).max().unwrap();
-        let mut doubled_rows: BTreeSet<i32> = (0..y_max).collect();
-        let mut doubled_cols: BTreeSet<i32> = (0..x_max).collect();
+        let mut doubled_rows: BTreeSet<i64> = (0..y_max).collect();
+        let mut doubled_cols: BTreeSet<i64> = (0..x_max).collect();
 
         for p in cells.iter() {
             doubled_cols.remove(&p.x);
@@ -86,7 +86,7 @@ fn for_each_pair<T, F: FnMut(&T, &T)>(values: &HashSet<T>, mut f: F) {
     }
 }
 
-fn ordered(a: i32, b: i32) -> (i32, i32) {
+fn ordered(a: i64, b: i64) -> (i64, i64) {
     if a < b {
         (a, b)
     } else {

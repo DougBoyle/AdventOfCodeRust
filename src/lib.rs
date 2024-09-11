@@ -220,7 +220,7 @@ fn shoelace_area_from_boundary_points(points: &Vec<Point>) -> i64 {
 
 pub fn shoelace_area_enclosed_cells_including_border(perimeter_cells: &Vec<Point>) -> i64 {
     let len = perimeter_cells.len();
-    let perimeter_len: u32 = (0..len).map(|i| {
+    let perimeter_len: u64 = (0..len).map(|i| {
         let p1 = &perimeter_cells[i];
         let p2 = &perimeter_cells[(i+1) % len];
         if !p1.is_orthogonal_to(p2) { panic!("Invalid cell outline, not grid aligned!") }

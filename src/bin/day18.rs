@@ -10,7 +10,7 @@ fn main() {
     println!("Part 2: Area {area}"); // 96116995735219
 }
 
-fn calc_enclosed_cells(instructions: impl Iterator<Item=(Direction, i32)>) -> i64 {
+fn calc_enclosed_cells(instructions: impl Iterator<Item=(Direction, i64)>) -> i64 {
     let mut position = Point {x: 0, y: 0};
     let mut border = vec![position];
     for (dir, steps) in instructions {
@@ -21,7 +21,7 @@ fn calc_enclosed_cells(instructions: impl Iterator<Item=(Direction, i32)>) -> i6
     rust_aoc::shoelace_area_enclosed_cells_including_border(&border)
 }
 
-fn parse_line(line: &str) -> (Direction, i32, (Direction, i32)) {
+fn parse_line(line: &str) -> (Direction, i64, (Direction, i64)) {
     let [dir, steps, colour] = line.split_ascii_whitespace().collect::<Vec<_>>().try_into().unwrap();
     let dir = parse_direction(dir);
     let steps = steps.parse().unwrap();
@@ -39,9 +39,9 @@ fn parse_direction(dir: &str) -> Direction {
     }
 }
 
-fn parse_colour(colour: &str) -> (Direction, i32) {
+fn parse_colour(colour: &str) -> (Direction, i64) {
     // '(#FF00FF)'
-    let steps = i32::from_str_radix(&colour[2..7], 16).unwrap();
+    let steps = i64::from_str_radix(&colour[2..7], 16).unwrap();
     let dir = parse_direction(&colour[7..8]);
     (dir, steps)
 }

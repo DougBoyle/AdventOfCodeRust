@@ -14,8 +14,8 @@ fn main() {
 
     println!("Part 1: Energized cells: {total}"); // 7434
 
-    let width = layout[0].len() as i32;
-    let height = layout.len() as i32;
+    let width = layout[0].len() as i64;
+    let height = layout.len() as i64;
 
     let maximum: usize = (0..width).map(|x| (Point {x, y: 0}, Direction::South))
         .chain((0..width).map(|x| (Point {x, y: height - 1}, Direction::North)))

@@ -37,7 +37,7 @@ trait Part {
         Grid { cells, width, height }
     }
 
-    fn calculate_load(grid: &Grid) -> i32 {
+    fn calculate_load(grid: &Grid) -> i64 {
         grid.cells.iter()
             .filter(|(_, r)| **r == Rock::Round)
             .map(|(p, _)| grid.height - p.y)
@@ -151,8 +151,8 @@ type Cells = HashMap<Point, Rock>;
 
 struct Grid {
     cells: Cells,
-    width: i32,
-    height: i32,
+    width: i64,
+    height: i64,
 }
 
 impl Grid {

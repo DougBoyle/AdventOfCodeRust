@@ -7,10 +7,10 @@ fn main() {
     let grid: Grid<Cell> = Grid::parse(rust_aoc::read_input(23), |c| c.try_into().unwrap());
 
     let (start, _) = grid.row(0).iter().enumerate().filter(|(_, &cell)| cell == Cell::Empty).next().unwrap();
-    let start = Point { x: start as i32, y: 0 };
+    let start = Point { x: start as i64, y: 0 };
     let (end, _) = grid.row((grid.height - 1) as usize).iter().enumerate()
         .filter(|(_, &cell)| cell == Cell::Empty).next().unwrap();
-    let end = Point { x: end as i32, y: grid.height - 1 };
+    let end = Point { x: end as i64, y: grid.height - 1 };
 
     println!("Start {start}, End {end}");
 

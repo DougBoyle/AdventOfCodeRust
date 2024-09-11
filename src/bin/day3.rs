@@ -62,7 +62,7 @@ impl Part for Part2 {
 }
 
 struct LineParser<'a> {
-    y: i32,
+    y: i64,
     current_num: u32,
     current_num_start: Point,
     symbol_grid: &'a mut HashSet<Point>,
@@ -101,7 +101,7 @@ impl LineParser<'_> {
         parser.process_gap(line.len().try_into().unwrap());
     }
 
-    fn process_digit(&mut self, n: u32, x: i32) {
+    fn process_digit(&mut self, n: u32, x: i64) {
         if self.current_num == 0 {
             self.current_num_start = Point { x, y: self.y }
         }
@@ -109,17 +109,17 @@ impl LineParser<'_> {
         self.current_num += n;
     }
 
-    fn process_gear(&mut self, x: i32) {
+    fn process_gear(&mut self, x: i64) {
         self.gears.insert(Point {x, y: self.y});
         self.process_symbol(x);
     }
 
-    fn process_symbol(&mut self, x: i32) {
+    fn process_symbol(&mut self, x: i64) {
         self.symbol_grid.insert(Point { x, y: self.y });
         self.process_gap(x);
     }
 
-    fn process_gap(&mut self, x: i32) {
+    fn process_gap(&mut self, x: i64) {
         if self.current_num == 0 { return }
 
         let end = Point { x: x-1, y: self.y };
