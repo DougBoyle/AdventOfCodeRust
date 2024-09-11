@@ -1,4 +1,6 @@
-use std::{collections::HashSet, io::Error, ops::{Add, Neg}, str::FromStr};
+use std::{collections::HashSet, io::Error, ops::Add, str::FromStr};
+
+use rust_aoc::point3::{Axis, Point3};
 
 
 fn main() {
@@ -124,45 +126,6 @@ impl FromStr for Brick {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Debug)]
-struct Point3 { x: i32, y: i32, z: i32 }
-
-impl Point3 {
-    fn project(&self, axis: Axis) -> i32 {
-        match axis {
-            Axis::X => self.x,
-            Axis::Y => self.y,
-            Axis::Z => self.z,
-        }
-    }
-}
-
-impl Add for Point3 {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        Point3 { x: self.x + rhs.x, y: self.y + rhs.y, z: self.z + rhs.z }
-    }
-}
-
-impl Neg for Point3 {
-    type Output = Point3;
-
-    fn neg(self) -> Self::Output {
-        Point3 { x: -self.x, y: -self.y, z: -self.z }
-    }
-}
-
-impl FromStr for Point3 {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let axes: Vec<i32> = s.split(',').map(|s| s.parse().unwrap()).collect();
-        assert!(axes.len() == 3);
-        Ok(Point3 { x: axes[0], y: axes[1], z: axes[2] })
-    }
-}
-
 // inclusive at endpoints i.e. an L shape counts
 fn lines_touch(a_start: i32, a_end: i32, b_start: i32, b_end: i32) -> bool {
     !disjoint_lines(a_start, a_end, b_start, b_end)
@@ -170,25 +133,4 @@ fn lines_touch(a_start: i32, a_end: i32, b_start: i32, b_end: i32) -> bool {
 
 fn disjoint_lines(a_start: i32, a_end: i32, b_start: i32, b_end: i32) -> bool {
     a_start > b_end || b_start > a_end
-}
-
-#[derive(Eq, PartialEq, Clone, Copy, Debug)]
-enum Axis {
-    X, Y, Z
-}
-
-impl Axis {
-    fn as_vec(&self) -> Point3 {
-        match self {
-            Axis::X => Point3 { x: 1, y: 0, z: 0 },
-            Axis::Y => Point3 { x: 0, y: 1, z: 0 },
-            Axis::Z => Point3 { x: 0, y: 0, z: 1 },
-        }
-    }
-}
-
-impl Axis {
-    fn all() -> [Axis; 3] {
-        [Axis::X, Axis::Y, Axis::Z]
-    }
 }

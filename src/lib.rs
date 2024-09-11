@@ -4,6 +4,7 @@ use std::{
 };
 
 pub mod point;
+pub mod point3;
 pub mod direction;
 pub mod grid;
 
