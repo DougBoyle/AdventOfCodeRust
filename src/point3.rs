@@ -1,10 +1,10 @@
 use std::{io::Error, ops::{Add, Neg}, str::FromStr};
 
 #[derive(Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Debug)]
-pub struct Point3 { pub x: i32, pub y: i32, pub z: i32 }
+pub struct Point3 { pub x: i64, pub y: i64, pub z: i64 }
 
 impl Point3 {
-    pub fn project(&self, axis: Axis) -> i32 {
+    pub fn project(&self, axis: Axis) -> i64 {
         match axis {
             Axis::X => self.x,
             Axis::Y => self.y,
@@ -33,7 +33,7 @@ impl FromStr for Point3 {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let axes: Vec<i32> = s.split(',').map(|s| s.trim().parse().unwrap()).collect();
+        let axes: Vec<i64> = s.split(',').map(|s| s.trim().parse().unwrap()).collect();
         assert!(axes.len() == 3);
         Ok(Point3 { x: axes[0], y: axes[1], z: axes[2] })
     }

@@ -92,7 +92,7 @@ struct Brick {
 }
 
 impl Brick {
-    fn project(&self, axis: Axis) -> (i32, i32) {
+    fn project(&self, axis: Axis) -> (i64, i64) {
         (self.start.project(axis), self.end.project(axis))
     }
 
@@ -127,10 +127,10 @@ impl FromStr for Brick {
 }
 
 // inclusive at endpoints i.e. an L shape counts
-fn lines_touch(a_start: i32, a_end: i32, b_start: i32, b_end: i32) -> bool {
+fn lines_touch(a_start: i64, a_end: i64, b_start: i64, b_end: i64) -> bool {
     !disjoint_lines(a_start, a_end, b_start, b_end)
 }
 
-fn disjoint_lines(a_start: i32, a_end: i32, b_start: i32, b_end: i32) -> bool {
+fn disjoint_lines(a_start: i64, a_end: i64, b_start: i64, b_end: i64) -> bool {
     a_start > b_end || b_start > a_end
 }
