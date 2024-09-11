@@ -1,6 +1,6 @@
-use std::{io::Error, str::FromStr};
+use std::{ io::Error, str::FromStr};
 
-use nalgebra::{Matrix2, Vector2};
+use nalgebra::{Matrix2, Vector2, Vector3};
 use num::abs;
 use rust_aoc::{point::Point, point3::Point3};
 
@@ -8,6 +8,7 @@ use rust_aoc::{point::Point, point3::Point3};
 fn main() {
     let stones: Vec<Stone> = rust_aoc::read_input(24).map(|s| s.parse().unwrap()).collect();
     part1(&stones);
+    part2(&stones);
 }
 
 fn part1(stones: &Vec<Stone>) {
@@ -20,11 +21,116 @@ fn part1(stones: &Vec<Stone>) {
     println!("Total intersections: {total}"); // 16939
 }
 
+fn part2(stones: &Vec<Stone>) {
+    println!("Part 2");
+
+    let num_stones = stones.len();
+
+    let parallel_pairs: usize = (0..num_stones).map(|i| {
+        let stone1 = &stones[i];
+        let v1 = as_vec3(&stone1.v);
+        (0..i).filter(|&j| {
+            let stone2 = &stones[j];
+            let v2 = as_vec3(&stone2.v);
+            is_parallel(v1, v2)
+        }).count()
+    }).sum();
+    
+    println!("Number of parallel pairs: {parallel_pairs}");
+    assert_eq!(0, parallel_pairs, "If lines were parallel, we could simplify the problem substantially");
+
+    // Complex calculation, so hard to guard against numeric precision issues.
+    // Instead, we just try various triplets of stones until we find a combination that appears to have suitably small error.
+    // (we could exploit knowning the intersections only happen at integer times, to do some error correction part way through,
+    //  but the exercise doesn't actually say this is guaranteed)
+    let (attempt, origin) = (0..num_stones/3)
+        .map(|i| part2_find_origin(&stones[3*i], &stones[3*i + 1], &stones[3*i + 2]))
+        .enumerate()
+        .filter(|(_, p)| is_integer_point(p))
+        .next()
+        .expect("Didn't find an integer point solution, suggests need to do something about arithmetic errors");
+    let attempt = attempt + 1;
+    let origin = Vector3::new(origin.x.round(), origin.y.round(), origin.z.round());
+    println!("Found origin on attempt {attempt}: {origin}");
+    println!("Sum of coordinates: {}", origin.x + origin.y + origin.z); // 931193307668256
+}
+
+/*
+ Let p_0 and v_0 be position/velocity of the stone, and each intersection at time t_i position q_i.
+ p_0, v_0 and t_i values all unknown, need to phrase question in terms of things we do know.
+
+ !! Shift everything to be vs the first stone's reference point i.e. p_i = p_i - p_1, v_i = v_i - v_1.
+ Time remains as-is, still t_1, t_2, t_3, etc. (the first stone from the input, not the unknown new stone!)
+
+ Now q_1 is just the origin 0, and we know the intersections form a straight line,
+ so (q_2 - q_1) parallel to (q_3 - q_1) => q_2 parallel to q_3.
+ Need to frame this as an equation, so take cross product: q_2 x q_3 = 0
+ Expanding:
+ (p_2 + t_2 v_2) x (p_3 + t_3 v_3) = 0
+ p_2 x p_3 + t_2 v_2 x p_3 + t_3 p_2 x v_3 + t_2 t_3 v_2 x v_3 = 0
+
+ 3D vectors, so at this point have 3 equations in terms of 2 variables, and could evaluate and try to solve
+ each dimension directly. However, can also remove the (t_2 * t_3) term to make it much simpler to solve.
+
+ !! Want to get back to scalar values for t_2 and t_3, so want to take a dot product. Also, for any a and b,
+    a x b is perpendicular to a and b, hence (a x b) * a = (a x b) * b = 0
+
+ Dot product with v_2:
+ (p_2 x p_3) * v_2 + 0 + t_3 (p_2 x v_3) * v_2 + 0 = 0
+ => t_3 = -( (p_2 x p_3) * v_2 ) / ( (p_2 x v_3) * v_2 )
+
+ with v_3:
+ (p_2 x p_3) * v_3 + t_2 (v_2 x p_3) * v_3 + 0 + 0 = 0
+ t_2 = -( (p_2 x p_3) * v_3 ) / ( (v_2 x p_3) * v_3 )
+
+ With t_2 and t_3, can now go back to real coordinates and calulate the intersection points, giving the actual line.
+ */
+fn part2_find_origin(s1: &Stone, s2: &Stone, s3: &Stone) -> Vector3<f64> {
+    let (p1, v1) = s1.as_vectors();
+    let (p2, v2) = s2.as_vectors();
+    let (p3, v3) = s3.as_vectors();
+
+    let (t2, t3) = {
+        // reframe everyting in terms of the first stone
+        let (p2, p3) = (p2 - p1, p3 - p1);
+        let (v2, v3) =  (v2 - v1, v3 - v1);
+        let t2 = -(p2.cross(&p3)).dot(&v3) / (v2.cross(&p3)).dot(&v3);
+        let t3 = -(p2.cross(&p3)).dot(&v2) / (p2.cross(&v3)).dot(&v2);
+        (t2, t3)
+    };
+
+    // Due to the size of the values involved (coordinates in the trillions),
+    // can get numeric stability issues. Rather than trying several combinations of rocks,
+    // could check times are "close" to integer values and round here before further
+    // arithmetic, but the task doesn't actually say intersections are at integer times. 
+
+    // assert!(abs(t2) % 1.0 < 1e-2);
+    // assert!(abs(t3) % 1.0 < 1e-2);
+    // let (t2, t3) = (t2.round(), t3.round());
+    // println!("Adjusted intersection times: {t2} and {t3}");
+
+    let q2 = p2 + t2 * v2;
+    let q3 = p3 + t3 * v3;
+
+    let v = (q3 - q2)/(t3 - t2);
+    let p = q3 - t3*v;
+    p
+}
+
+fn is_integer_point(p: &Vector3<f64>) -> bool {
+    is_zero(p.x - p.x.round()) && is_zero(p.y - p.y.round()) && is_zero(p.z - p.z.round())
+}
+
 const MIN: f64 = 200000000000000.0;
 const MAX: f64 = 400000000000000.0;
 //const MIN: f64 = 7.0;
 //const MAX: f64 = 27.0;
 const EPS: f64 = 1e-9;
+
+fn is_parallel(v1: Vector3<f64>, v2: Vector3<f64>) -> bool {
+    let cross = v1.cross(&v2);
+    is_zero(cross.x) && is_zero(cross.y) && is_zero(cross.z)
+}
 
 /*
 Each line is p + t v
@@ -138,6 +244,7 @@ struct Stone2 {
     v: Point,
 }
 
+#[derive(Debug, Copy, Clone)]
 struct Stone {
     pos: Point3,
     v: Point3,
@@ -147,6 +254,10 @@ impl Stone {
     fn project(&self) -> Stone2 {
         let (pos, v) = (project_point(self.pos), project_point(self.v));
         Stone2 { pos, v } 
+    }
+
+    fn as_vectors(&self) -> (Vector3<f64>, Vector3<f64>) {
+        (as_vec3(&self.pos), as_vec3(&self.v))
     }
 }
 
@@ -166,6 +277,10 @@ fn project_point(p: Point3) -> Point {
 
 fn as_vec2(p: &Point) -> Vector2<f64> {
     Vector2::new(p.x as f64, p.y as f64)
+}
+
+fn as_vec3(p: &Point3) -> Vector3<f64> {
+    Vector3::new(p.x as f64, p.y as f64, p.z as f64)
 }
 
 fn is_zero(f: f64) -> bool {
