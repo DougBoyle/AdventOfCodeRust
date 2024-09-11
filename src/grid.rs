@@ -27,6 +27,18 @@ impl<T> Grid<T> {
         self.cells.iter().flat_map(|row| row.iter())
     }
 
+    pub fn iter_mut(&mut self) -> impl Iterator<Item=&mut T> {
+        self.cells.iter_mut().flat_map(|row| row.iter_mut())
+    }
+
+    pub fn enumerate(&self) -> impl Iterator<Item=(Point, &T)> {
+        self.cells.iter().enumerate().flat_map(|(y, row)| 
+            row.iter().enumerate().map(move |(x, value)| 
+                (Point { x: x as i32, y: y as i32 }, value)
+            )
+        )
+    }
+
     pub fn map<U, F: FnMut(Point, T) -> U>(self, mut f: F) -> Grid<U> {
         Grid::new(self.cells.into_iter().enumerate()
             .map(|(y, row)| row.into_iter().enumerate()
@@ -36,6 +48,10 @@ impl<T> Grid<T> {
 
     pub fn get(&self, p: &Point) -> Option<&T> {
         self.cells.get(p.y as usize).map(|row| row.get(p.x as usize)).flatten()
+    }
+
+    pub fn row(&self, row: usize) -> &Vec<T> {
+        &self.cells[row]
     }
 }
 
