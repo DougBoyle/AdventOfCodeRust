@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::{HashMap, HashSet}, rc::Rc, time::Instant};
 
 use priority_queue::PriorityQueue;
 
@@ -8,10 +8,16 @@ fn main() {
 }
 
 fn part1() {
-    let mut graph = Graph::load();
+    let graph = Graph::load();
 
-    let len = graph.nodes.len(); // before any node merging happens
-    let half_of_cut = find_min_cut_stoer_wagner(&mut graph);
+    let len = graph.edges.len();
+
+    let start = Instant::now();
+    // Version 1: ~300ms
+    // Version 2: Separate HashSet of String node IDs, and edges instead just store Rc<String> references: No change
+    let half_of_cut = find_min_cut_stoer_wagner(&graph);
+    println!("Stoer Wagner took t={}ms",(Instant::now() - start).as_millis()); 
+
     let len1 = half_of_cut.len();
     let len2 = len - len1;
 
@@ -64,22 +70,22 @@ Proof:
  */
 fn find_min_cut_stoer_wagner(graph: &Graph) -> Vec<String> {
     let mut graph = graph.clone();
-    while graph.nodes.len() > 1 {
+    while graph.edges.len() > 1 {
         let (s, t, weight) = minimum_cut_phase(&graph);
         if weight <= CUTS_ALLOWED {
             // expand merged node t into the actual partition
             return t.split(MERGED_NODE_SEPARATOR).map(String::from).collect();
         } else {
-            merge_nodes(&mut graph, &s[..], &t[..]);
+            merge_nodes(&mut graph, &s, &t);
         }
     }
     panic!("Didn't find a suitable cut");
 }
 
-fn minimum_cut_phase(graph: &Graph) -> (String, String, usize) {
-    let mut queue: PriorityQueue<&str, usize> = PriorityQueue::new();
-    for node in graph.nodes.keys() {
-        queue.push(node, 0);
+fn minimum_cut_phase(graph: &Graph) -> (Node, Node, usize) {
+    let mut queue: PriorityQueue<Node, usize> = PriorityQueue::new();
+    for node in graph.edges.keys() {
+        queue.push(Rc::clone(node), 0);
     }
     let mut found = vec![];
     let mut last_weight = 0;
@@ -90,65 +96,83 @@ fn minimum_cut_phase(graph: &Graph) -> (String, String, usize) {
         last_weight = cut_weight;
     }
 
-    let len = found.len();
-    (String::from(found[len - 2]), String::from(found[len - 1]), last_weight)
+    let mut it = found.into_iter().rev();
+    let last = it.next().unwrap();
+    let second_last = it.next().unwrap();
+    (second_last, last, last_weight)
 }
 
-fn remove_node_and_update_weights<'a>(queue: &mut PriorityQueue<&'a str, usize>, graph: &Graph) -> (&'a str, usize) {
+fn remove_node_and_update_weights(queue: &mut PriorityQueue<Node, usize>, graph: &Graph) -> (Node, usize) {
     let (node, cut_weight) = queue.pop().unwrap();
-    for (neighbour, edge_weight) in &graph.nodes[node] {
-        queue.change_priority_by(&neighbour[..], |p| *p += edge_weight);
+    for (neighbour, edge_weight) in &graph.edges[&node] {
+        queue.change_priority_by(neighbour, |p| *p += edge_weight);
     }
     (node, cut_weight)
 }
 
-fn merge_nodes(graph: &mut Graph, s: &str, t: &str) {
-    let (s, s_neighbours) = graph.nodes.remove_entry(s).unwrap();
-    let (t, t_neighbours) = graph.nodes.remove_entry(t).unwrap();
+fn merge_nodes(graph: &mut Graph, s: &Node, t: &Node) {
+    let (s, s_neighbours) = graph.edges.remove_entry(s).unwrap();
+    let (t, t_neighbours) = graph.edges.remove_entry(t).unwrap();
 
-    let new_node = format!("{s}{MERGED_NODE_SEPARATOR}{t}");
-    graph.nodes.insert(new_node.clone(), HashMap::new());
+    let new_node = graph.get_or_create_node(format!("{s}{MERGED_NODE_SEPARATOR}{t}"));
 
     for (neighbour, _) in s_neighbours {
         if neighbour == t { continue; }
-        let neighbour_edges = graph.nodes.get_mut(&neighbour[..]).unwrap();
+        let neighbour_edges = graph.edges.get_mut(&neighbour).unwrap();
         if let Some(weight) = neighbour_edges.remove(&s) {
-            graph.add_or_update_edge(&new_node, &neighbour[..], weight);
+            graph.add_or_update_edge(&new_node, &neighbour, weight);
         }
     }
     for (neighbour, _) in t_neighbours {
         if neighbour == s { continue; }
-        let neighbour_edges = graph.nodes.get_mut(&neighbour[..]).unwrap();
+        let neighbour_edges = graph.edges.get_mut(&neighbour).unwrap();
         if let Some(weight) = neighbour_edges.remove(&t) {
-            graph.add_or_update_edge(&new_node, &neighbour[..], weight);
+            graph.add_or_update_edge(&new_node, &neighbour, weight);
         }
     }
 }
 
 #[derive(Clone)]
 struct Graph {
-    // node -> neighour -> weight
-    nodes: HashMap<String, HashMap<String, usize>>
+    nodes: HashSet<Rc<String>>,
+    edges: HashMap<Rc<String>, HashMap<Rc<String>, usize>>,
 }
+
+type Node = Rc<String>;
 
 impl Graph {
     fn load() -> Graph {
-        let mut graph = Graph { nodes: HashMap::new() };
+        let mut graph = Graph { nodes: HashSet::new(), edges: HashMap::new() };
         for line in rust_aoc::read_input(25) {
             let (node, neighbours) = rust_aoc::split_in_two(&line, ':');
             let (node, neighbours) = (node.trim(), neighbours.trim());
+            let node = graph.get_or_create_node(String::from(node));
             for neighbour in neighbours.split_ascii_whitespace() {
-                graph.add_or_update_edge(node, neighbour, 1);
+                let neighbour = graph.get_or_create_node(String::from(neighbour));
+                graph.add_or_update_edge(&node, &neighbour, 1);
             }
         }
         graph
     }
 
-    fn add_or_update_edge(&mut self, from: &str, to: &str, weight: usize) {
+    // from and to must already exist as nodes in the graph
+    fn add_or_update_edge(&mut self, from: &Node, to: &Node, weight: usize) {
         // edges are bi-directional, but only reported in one direction
-        self.nodes.entry(String::from(from)).or_insert_with(|| HashMap::new()).entry(String::from(to))
-            .and_modify(|w| *w += weight).or_insert(1);
-        self.nodes.entry(String::from(to)).or_insert_with(|| HashMap::new()).entry(String::from(from))
+        self.edges.get_mut(from).unwrap().entry(Rc::clone(to))
             .and_modify(|w| *w += weight).or_insert(weight);
+        self.edges.get_mut(to).unwrap().entry(Rc::clone(from))
+            .and_modify(|w| *w += weight).or_insert(weight);
+    }
+
+    fn get_or_create_node(&mut self, node: String) -> Rc<String> {
+        match self.nodes.get(&node) {
+            Some(node) => Rc::clone(node),
+            None => {
+                let node = Rc::new(node);
+                self.nodes.insert(Rc::clone(&node));
+                self.edges.insert(Rc::clone(&node), HashMap::new());
+                node
+            }
+        }
     }
 }
