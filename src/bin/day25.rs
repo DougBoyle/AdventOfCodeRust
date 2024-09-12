@@ -1,5 +1,6 @@
 use std::{collections::{HashMap, HashSet}, rc::Rc, time::Instant};
 
+use bimap::BiMap;
 use priority_queue::PriorityQueue;
 
 
@@ -10,23 +11,23 @@ fn main() {
 fn part1() {
     let graph = Graph::load();
 
-    let len = graph.edges.len();
+    let len = graph.node_ids.len();
+    println!("Length is {len}");
 
     let start = Instant::now();
     // Version 1: ~300ms
     // Version 2: Separate HashSet of String node IDs, and edges instead just store Rc<String> references: No change
-    let half_of_cut = find_min_cut_stoer_wagner(&graph);
+    // Version 3: Index of ID -> details of node, reduces time to ~230ms
+    let (merged_graph, half_of_cut_id) = find_min_cut_stoer_wagner(&graph);
     println!("Stoer Wagner took t={}ms",(Instant::now() - start).as_millis()); 
 
-    let len1 = half_of_cut.len();
+    let len1 = merged_graph.get_node_size(&half_of_cut_id);
     let len2 = len - len1;
 
     println!("Part 1: Split into {len1} and {len2}, result = {}", len1 * len2); // 583632
 }
 
 const CUTS_ALLOWED: usize = 3;
-
-const MERGED_NODE_SEPARATOR: char = '_';
 
 /*
 See https://en.wikipedia.org/wiki/Stoer%E2%80%93Wagner_algorithm 
@@ -68,24 +69,24 @@ Proof:
   As C is an s-t cut, the last node t is always active, and C_t = V (all nodes), so w(V / {t}, t) <= w(C).
   Hence the cut that just removes the last node t is the minimum s-t cut for last two nodes s, t.
  */
-fn find_min_cut_stoer_wagner(graph: &Graph) -> Vec<String> {
+fn find_min_cut_stoer_wagner(graph: &Graph) -> (Graph, usize) {
     let mut graph = graph.clone();
     while graph.edges.len() > 1 {
         let (s, t, weight) = minimum_cut_phase(&graph);
         if weight <= CUTS_ALLOWED {
             // expand merged node t into the actual partition
-            return t.split(MERGED_NODE_SEPARATOR).map(String::from).collect();
+            return (graph, t)
         } else {
-            merge_nodes(&mut graph, &s, &t);
+            graph.merge_nodes(&s, &t);
         }
     }
     panic!("Didn't find a suitable cut");
 }
 
-fn minimum_cut_phase(graph: &Graph) -> (Node, Node, usize) {
-    let mut queue: PriorityQueue<Node, usize> = PriorityQueue::new();
+fn minimum_cut_phase(graph: &Graph) -> (NodeId, NodeId, usize) {
+    let mut queue: PriorityQueue<NodeId, usize> = PriorityQueue::new();
     for node in graph.edges.keys() {
-        queue.push(Rc::clone(node), 0);
+        queue.push(*node, 0);
     }
     let mut found = vec![];
     let mut last_weight = 0;
@@ -102,7 +103,7 @@ fn minimum_cut_phase(graph: &Graph) -> (Node, Node, usize) {
     (second_last, last, last_weight)
 }
 
-fn remove_node_and_update_weights(queue: &mut PriorityQueue<Node, usize>, graph: &Graph) -> (Node, usize) {
+fn remove_node_and_update_weights(queue: &mut PriorityQueue<NodeId, usize>, graph: &Graph) -> (NodeId, usize) {
     let (node, cut_weight) = queue.pop().unwrap();
     for (neighbour, edge_weight) in &graph.edges[&node] {
         queue.change_priority_by(neighbour, |p| *p += edge_weight);
@@ -110,69 +111,101 @@ fn remove_node_and_update_weights(queue: &mut PriorityQueue<Node, usize>, graph:
     (node, cut_weight)
 }
 
-fn merge_nodes(graph: &mut Graph, s: &Node, t: &Node) {
-    let (s, s_neighbours) = graph.edges.remove_entry(s).unwrap();
-    let (t, t_neighbours) = graph.edges.remove_entry(t).unwrap();
-
-    let new_node = graph.get_or_create_node(format!("{s}{MERGED_NODE_SEPARATOR}{t}"));
-
-    for (neighbour, _) in s_neighbours {
-        if neighbour == t { continue; }
-        let neighbour_edges = graph.edges.get_mut(&neighbour).unwrap();
-        if let Some(weight) = neighbour_edges.remove(&s) {
-            graph.add_or_update_edge(&new_node, &neighbour, weight);
-        }
-    }
-    for (neighbour, _) in t_neighbours {
-        if neighbour == s { continue; }
-        let neighbour_edges = graph.edges.get_mut(&neighbour).unwrap();
-        if let Some(weight) = neighbour_edges.remove(&t) {
-            graph.add_or_update_edge(&new_node, &neighbour, weight);
-        }
-    }
-}
-
 #[derive(Clone)]
 struct Graph {
-    nodes: HashSet<Rc<String>>,
-    edges: HashMap<Rc<String>, HashMap<Rc<String>, usize>>,
+    node_ids: BiMap<Node, NodeId>,
+    edges: HashMap<NodeId, HashMap<NodeId, usize>>,
 }
 
-type Node = Rc<String>;
+type NodeId = usize;
+
+// Every node has an ID, and is either a Simple node with a String name, or composite node referencing 2 other IDs.
+// Having an 'index' avoids string copying, or needing to use Rc eveywhere.
+#[derive(Clone, Eq, PartialEq, Hash)]
+enum Node {
+    Simple(String),
+    Composite(NodeId, NodeId)
+}
 
 impl Graph {
     fn load() -> Graph {
-        let mut graph = Graph { nodes: HashSet::new(), edges: HashMap::new() };
+        let mut graph = Graph { node_ids: BiMap::new(), edges: HashMap::new() };
         for line in rust_aoc::read_input(25) {
             let (node, neighbours) = rust_aoc::split_in_two(&line, ':');
             let (node, neighbours) = (node.trim(), neighbours.trim());
-            let node = graph.get_or_create_node(String::from(node));
+            let node = graph.get_or_create_simple_node(String::from(node));
             for neighbour in neighbours.split_ascii_whitespace() {
-                let neighbour = graph.get_or_create_node(String::from(neighbour));
+                let neighbour = graph.get_or_create_simple_node(String::from(neighbour));
                 graph.add_or_update_edge(&node, &neighbour, 1);
             }
         }
         graph
     }
 
+    fn merge_nodes(&mut self, s: &NodeId, t: &NodeId) {
+        let (s, s_neighbours) = self.edges.remove_entry(s).unwrap();
+        let (t, t_neighbours) = self.edges.remove_entry(t).unwrap();
+    
+        let new_node = self.create_composite_node(s, t);
+    
+        for (neighbour, _) in s_neighbours {
+            if neighbour == t { continue; }
+            let neighbour_edges = self.edges.get_mut(&neighbour).unwrap();
+            if let Some(weight) = neighbour_edges.remove(&s) {
+                self.add_or_update_edge(&new_node, &neighbour, weight);
+            }
+        }
+        for (neighbour, _) in t_neighbours {
+            if neighbour == s { continue; }
+            let neighbour_edges = self.edges.get_mut(&neighbour).unwrap();
+            if let Some(weight) = neighbour_edges.remove(&t) {
+                self.add_or_update_edge(&new_node, &neighbour, weight);
+            }
+        }
+    }
+
     // from and to must already exist as nodes in the graph
-    fn add_or_update_edge(&mut self, from: &Node, to: &Node, weight: usize) {
+    fn add_or_update_edge(&mut self, from: &NodeId, to: &NodeId, weight: usize) {
         // edges are bi-directional, but only reported in one direction
-        self.edges.get_mut(from).unwrap().entry(Rc::clone(to))
+        self.edges.get_mut(from).unwrap().entry(*to)
             .and_modify(|w| *w += weight).or_insert(weight);
-        self.edges.get_mut(to).unwrap().entry(Rc::clone(from))
+        self.edges.get_mut(to).unwrap().entry(*from)
             .and_modify(|w| *w += weight).or_insert(weight);
     }
 
-    fn get_or_create_node(&mut self, node: String) -> Rc<String> {
-        match self.nodes.get(&node) {
-            Some(node) => Rc::clone(node),
+    fn get_or_create_simple_node(&mut self, node: String) -> NodeId {
+        let node = Node::Simple(node);
+        match self.node_ids.get_by_left(&node) {
+            Some(node) => *node,
             None => {
-                let node = Rc::new(node);
-                self.nodes.insert(Rc::clone(&node));
-                self.edges.insert(Rc::clone(&node), HashMap::new());
-                node
+                let id = self.get_next_id();
+                self.insert_node(node, id);
+                id
             }
+        }
+    }
+
+    fn create_composite_node(&mut self, first: NodeId, second: NodeId) -> NodeId {
+        let id = self.get_next_id();
+        let node = Node::Composite(first, second);
+        self.insert_node(node, id);
+        id
+    }
+
+    fn insert_node(&mut self, node: Node, id: NodeId) {
+        self.node_ids.insert(node, id);
+        self.edges.insert(id, HashMap::new());
+    }
+
+    fn get_next_id(&self) -> NodeId {
+        self.node_ids.len()
+    }
+
+    fn get_node_size(&self, id: &NodeId) -> usize {
+        match self.node_ids.get_by_right(id).unwrap() {
+            Node::Simple(_) => 1,
+            // We want to number of original leaves, the Composite node itself doesn't count towards size
+            Node::Composite(left, right) => self.get_node_size(left) + self.get_node_size(right),
         }
     }
 }
