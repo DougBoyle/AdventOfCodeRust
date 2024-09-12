@@ -1,7 +1,8 @@
-use std::{collections::{HashMap, HashSet}, rc::Rc, time::Instant};
+use std::{collections::HashMap, f64::consts::SQRT_2, time::Instant};
 
 use bimap::BiMap;
 use priority_queue::PriorityQueue;
+use rand::{rngs::ThreadRng, seq::IteratorRandom};
 
 
 fn main() {
@@ -25,6 +26,17 @@ fn part1() {
     let len2 = len - len1;
 
     println!("Part 1: Split into {len1} and {len2}, result = {}", len1 * len2); // 583632
+
+    let start = Instant::now();
+    let (merged_graph, first, second, _) = find_min_cut_karger(&graph);
+    // Can take up to a minute depending on luck.
+    println!("Karger took t={}ms",(Instant::now() - start).as_millis());
+    
+    let (len1, len2) = (merged_graph.get_node_size(&first), merged_graph.get_node_size(&second));
+    println!("Karger Stein: Split into {len1} and {len2}, result = {}", len1 * len2); // 583632
+
+
+
 }
 
 const CUTS_ALLOWED: usize = 3;
@@ -109,6 +121,67 @@ fn remove_node_and_update_weights(queue: &mut PriorityQueue<NodeId, usize>, grap
         queue.change_priority_by(neighbour, |p| *p += edge_weight);
     }
     (node, cut_weight)
+}
+
+/*
+See https://en.wikipedia.org/wiki/Karger%27s_algorithm
+
+Idea is to uniformly pick an edge to contract, then merge those two nodes,
+and repeat until only two nodes remain. This has a not-too-low chance of finding
+the min-cut, as edges on the min-cut are much rarer than non min-cut edges.
+
+However, it relies on us uniformly picking edges, not nodes, so that heavily connected
+nodes have a greater chance of being contracted.
+
+See Wikipedia for the probability proof that makes this reasonable.
+ */
+fn find_min_cut_karger(graph: &Graph) -> (Graph, NodeId, NodeId, usize) {
+    let mut rng = rand::thread_rng();
+    loop {
+        let graph = graph.clone();
+        let (graph, a, b, cost) = try_find_min_cut_karger_stein(graph, &mut rng);
+        if cost <= CUTS_ALLOWED { return (graph, a, b, cost) }
+        else { println!("Found cost {cost}, retrying...") }
+    }
+}
+
+// Karger–Stein - optimisation based on most failures happening towards the end of the process, not the start,
+//                so only contract until a 50% chance of failure, then branch into 2 and recurse.
+fn try_find_min_cut_karger_stein(mut graph: Graph, rng: &mut ThreadRng) -> (Graph, NodeId, NodeId, usize) {
+    let len = graph.edges.len();
+    if len <= 6 {
+        contract_until_trivial_cut(graph, rng)
+    } else {
+        let mut graph2 = graph.clone();
+        let t = (1.0 + (len as f64) / SQRT_2).ceil() as usize;
+
+        contract_until_size(&mut graph, t, rng);
+        let (g, a, b, cost) = try_find_min_cut_karger_stein(graph, rng);
+        if cost <= CUTS_ALLOWED {
+            (g, a, b, cost) // success
+        } else { // fall through and return whatever second attempt yields, may or may not be successful
+            contract_until_size(&mut graph2, t, rng);
+            try_find_min_cut_karger_stein(graph2, rng)
+        }
+    }
+}
+
+fn contract_until_trivial_cut(mut graph: Graph, rng: &mut ThreadRng) -> (Graph, NodeId, NodeId, usize) {
+    contract_until_size(&mut graph, 2, rng);
+    let (&a, edges) = graph.edges.iter().next().unwrap();
+    let (&b, &cost) = edges.iter().next().unwrap();
+    (graph, a, b, cost)
+}
+
+fn contract_until_size(graph: &mut Graph, min_nodes: usize, rng: &mut ThreadRng) {
+    while graph.edges.len() > min_nodes {
+        // Need a slightly different structure, to uniformly pick edges
+        // TODO: Could probably optimise by updating this, rather than regenerating each time - e.g. using an adjacency matrix
+        let edges: Vec<(usize, usize)> = graph.edges.iter().flat_map(|(i, edges)| edges.keys().map(move |j| (*i, *j))).collect();
+
+        let (s, t) = edges.iter().choose(rng).unwrap();
+        graph.merge_nodes(s, t);
+    }
 }
 
 #[derive(Clone)]
