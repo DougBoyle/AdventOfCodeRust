@@ -10,7 +10,7 @@ struct Part1 {}
 
 impl Part1 {
     fn process() {
-        let mut lines = rust_aoc::read_input(5);
+        let mut lines = aoc_2023::read_input(5);
 
         let mut seeds = Part1::parse_seeds(&lines.next().unwrap());
         lines.next().unwrap(); // blank line
@@ -36,7 +36,7 @@ struct Part2 {}
 
 impl Part2 {
     fn process() {
-        let mut lines = rust_aoc::read_input(5);
+        let mut lines = aoc_2023::read_input(5);
 
         let mut seeds = Part2::parse_seeds(&lines.next().unwrap());
         lines.next().unwrap(); // blank line

@@ -4,7 +4,7 @@ use rust_aoc::point3::{Axis, Point3};
 
 
 fn main() {
-    let mut bricks: Vec<Brick> = rust_aoc::read_input(22).map(|s| s.parse().unwrap()).collect();
+    let mut bricks: Vec<Brick> = aoc_2023::read_input(22).map(|s| s.parse().unwrap()).collect();
     // sort by (start) z coordinate, then just need to look at earlier bricks to simulate each brick falling, and never revisit
     bricks.sort_by_key(|p| p.start.z);
 

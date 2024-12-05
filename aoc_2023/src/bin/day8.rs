@@ -1,7 +1,7 @@
 use std::{collections::{BTreeSet, HashMap, HashSet}, io::{Error, ErrorKind}, str::FromStr};
 
 fn main() {
-    let mut input = rust_aoc::read_input(8);
+    let mut input = aoc_2023::read_input(8);
     let directions: Vec<_> = input.next().unwrap().chars().map(Direction::try_from).map(Result::unwrap).collect();
     let steps_per_cycle = directions.len();
     println!("Steps before cycling: {steps_per_cycle}"); // ~300

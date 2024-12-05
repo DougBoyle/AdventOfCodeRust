@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use rust_aoc::{direction::Direction, grid::Grid, point::Point, Dijkstra};
 
 fn main() {
-    let tiles: Grid<usize> = Grid::parse(rust_aoc::read_input(17), |c| c.to_digit(10).unwrap() as usize);
+    let tiles: Grid<usize> = Grid::parse(aoc_2023::read_input(17), |c| c.to_digit(10).unwrap() as usize);
 
     let start_point = Point {x: 0, y: 0};
     // 'start' is the only case where steps=0 and direction irrelevant, since we haven't moved yet

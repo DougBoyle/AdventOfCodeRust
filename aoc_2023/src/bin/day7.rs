@@ -17,7 +17,7 @@ trait Part: Sized {
     fn get_counts(&self, values: [char; 5]) -> HashMap<char, usize>;
 
     fn process() {
-        let mut bids: Vec<Bid<Self>> = rust_aoc::read_input(7).map(|s| s.parse()).map(Result::unwrap).collect();
+        let mut bids: Vec<Bid<Self>> = aoc_2023::read_input(7).map(|s| s.parse()).map(Result::unwrap).collect();
         bids.sort_by(|first, second| first.hand.cmp(&second.hand));
         let total: usize = bids.iter().rev().enumerate().map(|(i, bid)| (i+1)*bid.bid).sum();
         // 1. 253910319

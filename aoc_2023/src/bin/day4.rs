@@ -8,7 +8,7 @@ fn main() {
 }
 
 fn part1() {
-    let total: u32 = rust_aoc::read_input(4).map(|line| score(&line)).sum();
+    let total: u32 = aoc_2023::read_input(4).map(|line| score(&line)).sum();
     println!("Total: {total}") // 21558
 }
 
@@ -19,7 +19,7 @@ fn score(line: &str) -> u32 {
 }
 
 fn part2() {
-    let num_winners: Vec<_> = rust_aoc::read_input(4).map(|line| count_winners(&line)).collect();
+    let num_winners: Vec<_> = aoc_2023::read_input(4).map(|line| count_winners(&line)).collect();
     let len = num_winners.len();
     let mut num_cards = vec![1; len];
     

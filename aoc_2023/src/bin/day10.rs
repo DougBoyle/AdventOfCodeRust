@@ -10,7 +10,7 @@ fn main() {
     let mut grid = HashMap::new();
     let mut start = Point {x: -1, y: -1};
     
-    rust_aoc::process_grid(10, |p, c| { parse(p, c, &mut grid, &mut start) });
+    aoc_2023::process_grid(10, |p, c| { parse(p, c, &mut grid, &mut start) });
 
     println!("Grid: {}", grid.len());
     println!("Start: {start}");

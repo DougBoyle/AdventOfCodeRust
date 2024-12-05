@@ -159,7 +159,7 @@ fn reachable_cells_at_each_point(start: &Point, grid: &Grid<Cell>, steps: Vec<i6
 
 fn load_grid() -> (Point, Grid<Cell>) {
     let mut start = Point { x: -1, y: -1 };
-    let grid = Grid::parse(rust_aoc::read_input(21), |c| c).map(|p, c| {
+    let grid = Grid::parse(aoc_2023::read_input(21), |c| c).map(|p, c| {
         match c {
             '.' => Cell::Garden,
             '#' => Cell::Rock,

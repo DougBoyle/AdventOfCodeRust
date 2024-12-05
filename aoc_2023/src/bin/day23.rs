@@ -4,7 +4,7 @@ use rust_aoc::{direction::Direction, grid::Grid, point::Point};
 
 
 fn main() {
-    let grid: Grid<Cell> = Grid::parse(rust_aoc::read_input(23), |c| c.try_into().unwrap());
+    let grid: Grid<Cell> = Grid::parse(aoc_2023::read_input(23), |c| c.try_into().unwrap());
 
     let (start, _) = grid.row(0).iter().enumerate().filter(|(_, &cell)| cell == Cell::Empty).next().unwrap();
     let start = Point { x: start as i64, y: 0 };

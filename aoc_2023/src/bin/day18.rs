@@ -1,7 +1,7 @@
 use rust_aoc::{direction::Direction, point::Point};
 
 fn main() {
-    let instructions: Vec<_> = rust_aoc::read_input(18).map(|s| parse_line(&s)).collect();
+    let instructions: Vec<_> = aoc_2023::read_input(18).map(|s| parse_line(&s)).collect();
 
     let area =  calc_enclosed_cells(instructions.iter().map(|(dir, steps, _)| (*dir, *steps)));
     println!("Part 1: Area {area}"); // 41019

@@ -10,15 +10,15 @@ pub mod grid;
 
 use point::Point;
 
-pub fn read_input(day: u32) -> impl Iterator<Item=String> {
-    let filename = format!("resources/day{day}.txt");
+pub fn read_input(package: &str, day: u32) -> impl Iterator<Item=String> {
+    let filename = format!("{package}/resources/day{day}.txt");
     let f = File::open(&filename).expect(format!("Couldn't open {filename}").as_str());
     BufReader::new(f).lines().map(Result::unwrap)
 }
 
 /// f(point, character) for each cell of the grid, with the first character in the top left being Point { x: 0, y: 0 }
-pub fn process_grid<F: FnMut(Point, char)>(day: u32, mut f: F) {
-    read_input(day).enumerate().for_each(|(y, line)| line.chars().enumerate().for_each(|(x, c)|
+pub fn process_grid<F: FnMut(Point, char)>(package: &str, day: u32, mut f: F) {
+    read_input(package, day).enumerate().for_each(|(y, line)| line.chars().enumerate().for_each(|(x, c)|
         f(Point { x: x.try_into().unwrap(), y: y.try_into().unwrap() }, c)
     ));
 }

@@ -203,7 +203,7 @@ enum Node {
 impl Graph {
     fn load() -> Graph {
         let mut graph = Graph { node_ids: BiMap::new(), edges: HashMap::new() };
-        for line in rust_aoc::read_input(25) {
+        for line in aoc_2023::read_input(25) {
             let (node, neighbours) = rust_aoc::split_in_two(&line, ':');
             let (node, neighbours) = (node.trim(), neighbours.trim());
             let node = graph.get_or_create_simple_node(String::from(node));

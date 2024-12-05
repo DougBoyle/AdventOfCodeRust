@@ -15,7 +15,7 @@ const NINE: &str = "nine";
 fn main() {
     let processor = LineProcessor2::new();
 
-    let total: u32 = rust_aoc::read_input(1).map(|line| processor.process(line)).sum();
+    let total: u32 = aoc_2023::read_input(1).map(|line| processor.process(line)).sum();
 
     // 1. 54953
     // 2. 53868

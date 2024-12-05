@@ -10,7 +10,7 @@ trait Part {
     fn predict_impl(values: Vec<i64>, next_delta: i64) -> i64;
 
     fn process() {
-        let total: i64 = rust_aoc::read_input(9).map(|s| parse_line(&s)).map(|values| Self::predict(values)).sum();
+        let total: i64 = aoc_2023::read_input(9).map(|s| parse_line(&s)).map(|values| Self::predict(values)).sum();
         println!("Total: {total}");
     }
 

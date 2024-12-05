@@ -11,7 +11,7 @@ trait Part {
     fn parse(s: String) -> Configuration;
 
     fn process() {
-        let total: usize = rust_aoc::read_input(12).map(Self::parse)
+        let total: usize = aoc_2023::read_input(12).map(Self::parse)
             .map(Configuration::permutations)
             .sum();
         // 1. 6827

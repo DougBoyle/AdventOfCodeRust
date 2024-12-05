@@ -2,7 +2,7 @@ use std::ops::Range;
 
 
 fn main() {
-    let patterns: Vec<Pattern> = rust_aoc::read_input(13).map(|s| s.chars().collect()).collect::<Vec<_>>()
+    let patterns: Vec<Pattern> = aoc_2023::read_input(13).map(|s| s.chars().collect()).collect::<Vec<_>>()
         .split(|row: &Vec<char>| row.is_empty()).map(|pattern| pattern.to_owned()).collect();
 
     println!("Part 1");

@@ -1,7 +1,7 @@
 use linked_hash_map::LinkedHashMap;
 
 fn main() {
-    let line = rust_aoc::read_input(15).next().unwrap();
+    let line = aoc_2023::read_input(15).next().unwrap();
     let total: usize = line.split(',').map(hash).sum();
     println!("Part 1: Total hashes {total}"); // 505379
 

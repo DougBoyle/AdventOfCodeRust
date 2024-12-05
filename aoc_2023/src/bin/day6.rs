@@ -9,7 +9,7 @@ struct Part1 {}
 
 impl Part1 {
     fn process() {
-        let mut lines = rust_aoc::read_input(6);
+        let mut lines = aoc_2023::read_input(6);
         let times = Part1::parse_line(&lines.next().unwrap());
         let distances = Part1::parse_line(&lines.next().unwrap());
         let total_ways: usize = times.iter().zip(distances.iter())
@@ -28,7 +28,7 @@ struct Part2 {}
 
 impl Part2 {
     fn process() {
-        let mut lines = rust_aoc::read_input(6);
+        let mut lines = aoc_2023::read_input(6);
         let time = Part2::parse_line(&lines.next().unwrap());
         let distance = Part2::parse_line(&lines.next().unwrap());
         let possibilities = ways_to_beat_distance(time, distance);

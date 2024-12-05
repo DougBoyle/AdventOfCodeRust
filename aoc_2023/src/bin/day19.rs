@@ -3,7 +3,7 @@ use std::{cmp::{max, min}, collections::HashMap, io::{Error, ErrorKind}, ops::{D
 use enum_map::{Enum, EnumMap};
 
 fn main() {
-    let mut lines = rust_aoc::read_input(19);
+    let mut lines = aoc_2023::read_input(19);
     let mut workflows = HashMap::new();
     for workflow in lines.by_ref().take_while(|s| !s.is_empty()).map(|s| s.parse::<Workflow>().unwrap()) {
         workflows.insert(workflow.id.clone(), workflow);

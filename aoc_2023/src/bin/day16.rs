@@ -3,7 +3,7 @@ use std::{collections::HashSet, io::{Error, ErrorKind}};
 use rust_aoc::{direction::Direction, point::Point, BreadthFirstSearch};
 
 fn main() {
-    let layout: Vec<Vec<TileKind>> = rust_aoc::read_input(16)
+    let layout: Vec<Vec<TileKind>> = aoc_2023::read_input(16)
         .map(|line| line.chars().map(TileKind::try_from).map(Result::unwrap).collect())
         .collect();
 

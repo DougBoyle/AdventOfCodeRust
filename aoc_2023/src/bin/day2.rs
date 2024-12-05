@@ -7,7 +7,7 @@ use enum_map::{enum_map, Enum, EnumMap};
 fn main() {
     let part = Part2::new();
 
-    let games = rust_aoc::read_input(2).map(|line| line.parse().unwrap());
+    let games = aoc_2023::read_input(2).map(|line| line.parse().unwrap());
     let total = part.process(games);
 
     // 1. 2512

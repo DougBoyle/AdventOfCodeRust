@@ -6,7 +6,7 @@ use rust_aoc::{point::Point, point3::Point3};
 
 
 fn main() {
-    let stones: Vec<Stone> = rust_aoc::read_input(24).map(|s| s.parse().unwrap()).collect();
+    let stones: Vec<Stone> = aoc_2023::read_input(24).map(|s| s.parse().unwrap()).collect();
     part1(&stones);
     part2(&stones);
 }

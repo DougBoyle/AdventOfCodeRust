@@ -217,7 +217,7 @@ struct Machine {
 
 impl Machine {
     fn parse() -> HashMap<String, ParsedModule> {
-        let mut parsed_modules: HashMap<String, RefCell<ParsedModule>> = rust_aoc::read_input(20)
+        let mut parsed_modules: HashMap<String, RefCell<ParsedModule>> = aoc_2023::read_input(20)
             .map(|s| s.parse().unwrap())
             .map(|module: ParsedModule| (module.id.clone(), RefCell::new(module)))
             .collect();

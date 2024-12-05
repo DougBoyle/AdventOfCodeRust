@@ -24,7 +24,7 @@ impl Input {
         let mut gears = HashSet::new();
         let mut numbers = HashSet::new();
 
-        rust_aoc::read_input(3)
+        aoc_2023::read_input(3)
             .enumerate()
             .for_each(|(i, line)| LineParser::parse(&line, i, &mut symbol_grid, &mut gears, &mut numbers));
 
