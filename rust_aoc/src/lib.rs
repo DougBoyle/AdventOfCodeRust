@@ -25,7 +25,7 @@ pub fn process_grid<F: FnMut(Point, char)>(package: &str, day: u32, mut f: F) {
 
 pub fn split_in_two(s: &str, separator: char) -> (&str, &str) {
     let split: Vec<_> = s.split(separator).collect();
-    assert!(split.len() == 2);
+    assert!(split.len() == 2, "Split had more than 2 elements: {split:?}");
     (split[0], split[1])
 }
 

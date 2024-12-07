@@ -3,4 +3,5 @@
 members = [
     "rust_aoc",
     "aoc_2023",
+    "aoc_2024",
 ]

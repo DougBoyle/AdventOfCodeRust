@@ -27,6 +27,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "aoc_2024"
+version = "0.1.0"
+dependencies = [
+ "bimap",
+ "enum-map",
+ "linked-hash-map",
+ "nalgebra",
+ "num",
+ "priority-queue",
+ "rand",
+ "regex",
+ "rust_aoc",
+]
+
+[[package]]
 name = "approx"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
