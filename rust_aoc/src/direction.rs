@@ -22,6 +22,15 @@ impl Direction {
             Direction::West => Direction::East,
         }
     }
+
+    pub const fn clockwise_quarter_turn(&self) -> Direction {
+        match &self {
+            Direction::North => Direction::East,
+            Direction::East => Direction::South,
+            Direction::South => Direction::West,
+            Direction::West => Direction::North,
+        }
+    }
 }
 
 impl Add<Direction> for Point {
