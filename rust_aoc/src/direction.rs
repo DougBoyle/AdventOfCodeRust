@@ -28,23 +28,13 @@ impl Add<Direction> for Point {
     type Output = Point;
     
     fn add(self, dir: Direction) -> Self::Output {
-        match dir {
-            Direction::North => Point { x: self.x, y: self.y - 1 },
-            Direction::South => Point { x: self.x, y: self.y + 1 },
-            Direction::East => Point { x: self.x + 1, y: self.y },
-            Direction::West => Point { x: self.x - 1, y: self.y },
-        }
+        self + Point::from(dir)
     }
 }
 
 impl AddAssign<Direction> for Point {
     fn add_assign(&mut self, dir: Direction) {
-        match dir {
-            Direction::North => self.y -= 1,
-            Direction::South => self.y += 1,
-            Direction::East => self.x += 1,
-            Direction::West => self.x -= 1,
-        }
+        *self += Point::from(dir);
     }
 }
 
@@ -60,6 +50,7 @@ impl TryFrom<Point> for Direction {
     }
 }
 
+/// "North" is -ve in the y-axis, since row 0 of an input file is the top row.
 impl From<Direction> for Point {
     fn from(value: Direction) -> Self {
         match value {

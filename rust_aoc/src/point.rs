@@ -47,6 +47,13 @@ impl std::ops::Mul<i64> for Point {
     }
 }
 
+impl std::ops::Mul<Point> for i64 {
+    type Output = Point;
+    fn mul(self, p: Point) -> Self::Output {
+        p * self
+    }
+}
+
 struct PointIterator { start: Point, end: Point, incr: Point, inclusive_end: bool }
 
 impl PointIterator {
