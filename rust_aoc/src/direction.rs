@@ -10,11 +10,11 @@ pub enum Direction {
 }
 
 impl Direction {
-    pub fn all() -> [Direction; 4] {
+    pub const fn all() -> [Direction; 4] {
         [Direction::North, Direction::South, Direction::East, Direction::West]
     }
 
-    pub fn opposite(&self) -> Direction {
+    pub const fn opposite(&self) -> Direction {
         match &self {
             Direction::North => Direction::South,
             Direction::South => Direction::North,
@@ -30,6 +30,11 @@ impl Direction {
             Direction::South => Direction::West,
             Direction::West => Direction::North,
         }
+    }
+
+    pub const fn perpendicular(&self) -> [Direction; 2] {
+        let rotated = self.clockwise_quarter_turn();
+        [rotated, rotated.opposite()]
     }
 }
 

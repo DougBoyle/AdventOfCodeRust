@@ -2,6 +2,7 @@ use std::ops::{Index, IndexMut};
 
 use crate::point::Point;
 
+#[derive(Clone)]
 pub struct Grid<T> {
     cells: Vec<Vec<T>>,
     pub width: i64,
