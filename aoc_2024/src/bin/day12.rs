@@ -5,45 +5,39 @@ use rust_aoc::{direction::Direction, grid::Grid, point::Point};
 
 
 fn main() {
-    part1();
-    part2();
+    part1::run();
+    part2::run();
 }
 
-fn part1() {
-    let grid = read_grid();
-    let mut marked = grid.clone().map(|_, _| false);
+mod part1 {
+    use super::*;
 
-    let mut total = 0;
-
-    for (start, _) in grid.enumerate() {
-        if !marked[&start] {
-            total += find_region_price(start, &grid, &mut marked);
-        }
+    pub fn run() {
+        let grid = read_grid();
+        let mut factory = Factory { total: 0 };
+        visit_all_regions(&mut factory, &grid);
+        println!("Total: {}", factory.total); // 1488414
     }
 
-    println!("Total: {total}"); // 1488414
-}
+    struct Factory { total: usize }
 
-fn part2() {
-    let grid = read_grid();
-    let mut marked = grid.clone().map(|_, _| false);
-
-    let mut total = 0;
-
-    for (start, _) in grid.enumerate() {
-        if !marked[&start] {
-            total += find_region_price2(start, &grid, &mut marked);
+    impl VisitorFactory for Factory {
+        type Visitor = Visitor;
+    
+        fn new_region(&mut self) -> Visitor {
+            Visitor { area: 0, perimeter: 0 }
+        }
+    
+        fn region_complete(&mut self, visitor: Visitor) {
+            self.total += visitor.area * visitor.perimeter;
         }
     }
-
-    println!("Total: {total}"); // 911750
-}
-
-fn find_region_price(start: Point, grid: &Grid<char>, marked: &mut Grid<bool>) -> usize {
+    
     struct Visitor {
         area: usize,
         perimeter: usize,
     }
+    
     impl RegionVisitor for Visitor {
         fn cell(&mut self, _: Point) {
             self.area += 1;
@@ -53,19 +47,40 @@ fn find_region_price(start: Point, grid: &Grid<char>, marked: &mut Grid<bool>) -
             self.perimeter += 1;
         }
     }
-
-    let mut visitor = Visitor { area: 0, perimeter: 0 };
-    visit_region(start,grid, marked, &mut visitor);
-    visitor.area * visitor.perimeter
 }
 
-fn find_region_price2(start: Point, grid: &Grid<char>, marked: &mut Grid<bool>) -> usize {
+mod part2 {
+    use super::*;
+
+    pub fn run() {
+        let grid = read_grid();
+        let mut factory = Factory { grid: &grid, total: 0 };
+        visit_all_regions(&mut factory, &grid);
+    
+        println!("Total: {}", factory.total); // 911750
+    }
+
+    struct Factory<'a> { grid: &'a Grid<char>, total: usize }
+
+    impl<'a> VisitorFactory for Factory<'a> {
+        type Visitor = Visitor<'a>;
+    
+        fn new_region(&mut self) -> Visitor<'a> {
+            Visitor { area: 0, sides: 0, visited: HashSet::new(), grid: &self.grid }
+        }
+    
+        fn region_complete(&mut self, visitor: Visitor) {
+            self.total += visitor.area * visitor.sides;
+        }
+    }
+    
     struct Visitor<'a> {
         area: usize,
         sides: usize,
         visited: HashSet<Point>,
         grid: &'a Grid<char>,
     }
+
     impl RegionVisitor for Visitor<'_> {
         fn cell(&mut self, p: Point) {
             self.area += 1;
@@ -84,15 +99,29 @@ fn find_region_price2(start: Point, grid: &Grid<char>, marked: &mut Grid<bool>) 
             self.sides -= adjacent_borders; // If there's a border on either side, we double-counted earlier and will now decrement overall
         }
     }
+}
 
-    let mut visitor = Visitor { area: 0, sides: 0, visited: HashSet::new(), grid };
-    visit_region(start, grid, marked, &mut visitor);
-    visitor.area * visitor.sides
+trait VisitorFactory {
+    type Visitor: RegionVisitor;
+    fn new_region(&mut self) -> Self::Visitor;
+    fn region_complete(&mut self, visitor: Self::Visitor);
 }
 
 trait RegionVisitor {
     fn cell(&mut self, p: Point);
     fn edge(&mut self, p: Point, d: Direction);
+}
+
+fn visit_all_regions<Factory: VisitorFactory>(factory: &mut Factory, grid: &Grid<char>) {
+    let mut marked = grid.clone().map(|_, _| false);
+
+    for (start, _) in grid.enumerate() {
+        if !marked[&start] {
+            let mut visitor  = factory.new_region();
+            visit_region(start, grid, &mut marked, &mut visitor);
+            factory.region_complete(visitor);
+        }
+    }
 }
 
 fn visit_region<Visitor: RegionVisitor>(start: Point, grid: &Grid<char>, marked: &mut Grid<bool>, visitor: &mut Visitor) {
