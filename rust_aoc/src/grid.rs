@@ -16,6 +16,11 @@ impl<T> Grid<T> {
         Grid { cells, width: width as i64, height: height as i64 }
     }
 
+    pub fn generate<F: FnMut(Point) -> T>(width: i64, height: i64, f: &mut F) -> Self {
+        let cells = (0..height).map(|y| (0..width).map(|x| f(Point { x, y })).collect()).collect();
+        Grid { cells, width, height }
+    }
+
     pub fn parse<F: FnMut(char) -> T>(lines: impl Iterator<Item=String>, mut f: F) -> Self {
         Self::new(lines.map(|line| line.chars().map(|c| f(c)).collect()).collect())
     }
@@ -30,6 +35,10 @@ impl<T> Grid<T> {
 
     pub fn iter_mut(&mut self) -> impl Iterator<Item=&mut T> {
         self.cells.iter_mut().flat_map(|row| row.iter_mut())
+    }
+
+    pub fn iter_rows(&self) -> impl Iterator<Item=impl Iterator<Item=&T>> {
+        self.cells.iter().map(|row| row.iter())
     }
 
     pub fn enumerate(&self) -> impl Iterator<Item=(Point, &T)> {
