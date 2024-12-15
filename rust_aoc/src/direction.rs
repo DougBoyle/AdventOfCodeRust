@@ -64,6 +64,20 @@ impl TryFrom<Point> for Direction {
     }
 }
 
+impl TryFrom<char> for Direction {
+    type Error = Error;
+
+    fn try_from(value: char) -> Result<Self, Self::Error> {
+        match value {
+            '^' => Ok(Direction::North),
+            '>' => Ok(Direction::East),
+            'v' => Ok(Direction::South),
+            '<' => Ok(Direction::West),
+            _ => Err(Error::new(ErrorKind::InvalidInput, format!("'{value}' does not correspond to a direction")))
+        }
+    }
+}
+
 /// "North" is -ve in the y-axis, since row 0 of an input file is the top row.
 impl From<Direction> for Point {
     fn from(value: Direction) -> Self {
