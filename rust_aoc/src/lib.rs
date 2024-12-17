@@ -1,6 +1,6 @@
 
 use std::{
-    collections::{BinaryHeap, HashMap, VecDeque}, fs::File, io::{BufRead, BufReader}
+    collections::{BinaryHeap, HashMap, HashSet, VecDeque}, fs::File, io::{BufRead, BufReader}
 };
 
 pub mod point;
@@ -63,8 +63,12 @@ pub trait Dijkstra: Sized {
 
     fn is_end(&self, state: &Self::State) -> bool;
 
+    /// A vector of edge costs (not the cumulative cost) to valid next states
     fn neighbours(&self, value: &Self::State) -> Vec<(usize, Self::State)>;
 
+     /// true if the new state/cost is worth exploring.
+     /// In the simple case this method will just update a map of lower bounds,
+     /// but the API allows for more complex conditions e.g. being a lower bound of several related nodes.
     fn try_improve(&mut self, state: &Self::State, cost: usize) -> bool;
 
     fn search(mut self, starts: Vec<Self::State>) -> usize {
@@ -84,6 +88,65 @@ pub trait Dijkstra: Sized {
                 }
             }
         }
+    }
+}
+
+/// Finds all min paths, not just the first one
+pub trait ExhaustiveDijkstra : Dijkstra 
+where Self::State : Copy + Eq + std::hash::Hash {
+    /// Unlike regular Dijkstra, sufficient to be equal to the best cost found so far,
+    /// not necessarily better, as we want to find all min paths rather than just one.
+    fn try_not_worse(&mut self, state: &Self::State, cost: usize) -> bool;
+
+    fn all_min_paths_nodes(mut self, starts: Vec<Self::State>) -> Vec<Self::State> {
+        let immediate_ends: Vec<_> = starts.iter().filter(|s| self.is_end(s)).copied().collect();
+        if !immediate_ends.is_empty() { return immediate_ends };
+
+        let mut to_explore: BinaryHeap<DijkstraCost<Self::State>> = BinaryHeap::new();
+        let mut visited_from = HashMap::new();
+
+        for start in starts {
+            to_explore.push(DijkstraCost {value: start, cost: 0});
+            visited_from.insert((start, 0), HashSet::new());
+        }
+
+        let mut end_cost = None;
+        let mut end_states = HashSet::new();
+
+        loop {
+            let DijkstraCost { cost, value } = match to_explore.pop() {
+                None => { break; },
+                Some(val) => val,
+            };
+
+            for (added_cost, new_value) in self.neighbours(&value) {
+                let new_cost = cost + added_cost;
+                if let Some(end_cost) = end_cost {
+                    if new_cost > end_cost { continue; }
+                }
+                if self.is_end(&new_value) {
+                    if let None = end_cost { end_cost = Some(new_cost) };
+                    end_states.insert(new_value);
+                }
+                if self.try_not_worse(&new_value, new_cost) {
+                    to_explore.push(DijkstraCost { cost: new_cost, value: new_value });
+                    visited_from.entry((new_value, new_cost)).or_insert(HashSet::new()).insert((value, cost));
+                }
+            }
+        }
+
+        // Now walk backwards to find all valid paths to end
+        let end_cost = end_cost.unwrap();
+        let mut on_valid_path = HashSet::new();
+        let mut to_explore: Vec<_> = end_states.into_iter().map(|state| (state, end_cost)).collect();
+        while !to_explore.is_empty() {
+            let (state, cost) = to_explore.pop().unwrap();
+            on_valid_path.insert(state);
+
+            to_explore.extend(visited_from[&(state, cost)].iter());
+        }
+
+        on_valid_path.into_iter().collect()
     }
 }
 

@@ -65,6 +65,13 @@ impl<T> Grid<T> {
     }
 }
 
+impl Grid<char> {
+    pub fn from_strings(lines: impl Iterator<Item=String>) -> Self {
+        Self::new(lines.map(|line| line.chars().collect()).collect())
+    }
+
+}
+
 impl<T> Index<&Point> for Grid<T> {
     type Output = T;
 
