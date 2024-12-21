@@ -11,9 +11,9 @@ fn main() {
 fn part1() {
     let (grid, start, end) = parse_input();
     
-    let search = GridSearch { grid, end, min_costs: HashMap::new() };
+    let mut search = GridSearch { grid, end, min_costs: HashMap::new() };
 
-    let min_cost = search.search(vec![(start, Direction::East)]);
+    let min_cost = search.search(vec![(start, Direction::East)]).unwrap();
 
     println!("Min cost: {min_cost}"); // 99448
 }

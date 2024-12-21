@@ -11,23 +11,23 @@ fn main() {
         .map(|last_dir| Crucible { point: start_point, last_dir, steps: 0 })
         .into_iter().collect();    
 
-    let grid_search = GridSearch {
+    let mut grid_search = GridSearch {
         tiles: &tiles,
         state_upper_bounds: HashMap::new(),
         constraints: Constraints { min_steps: 1, max_steps: 3 }
     };
 
-    let min_cost = grid_search.search(starts.clone());
+    let min_cost = grid_search.search(starts.clone()).unwrap();
     
     println!("Part 1: Min cost {min_cost}"); // 635
 
-    let grid_search = GridSearch {
+    let mut grid_search = GridSearch {
         tiles: &tiles,
         state_upper_bounds: HashMap::new(),
         constraints: Constraints { min_steps: 4, max_steps: 10 }
     };
 
-    let min_cost = grid_search.search(starts);
+    let min_cost = grid_search.search(starts).unwrap();
     
     println!("Part 2: Min cost {min_cost}"); // 734
 }

@@ -71,15 +71,16 @@ pub trait Dijkstra: Sized {
      /// but the API allows for more complex conditions e.g. being a lower bound of several related nodes.
     fn try_improve(&mut self, state: &Self::State, cost: usize) -> bool;
 
-    fn search(mut self, starts: Vec<Self::State>) -> usize {
+    fn search(&mut self, starts: Vec<Self::State>) -> Option<usize> {
         let mut to_explore: BinaryHeap<DijkstraCost<Self::State>> = BinaryHeap::new();
         for start in starts {
+            self.try_improve(&start, 0); // ensure start included in any maps
             to_explore.push(DijkstraCost {value: start, cost: 0});
         }
 
         loop {
-            let DijkstraCost { cost, value } = to_explore.pop().unwrap();
-            if self.is_end(&value) { return cost }
+            let DijkstraCost { cost, value } = to_explore.pop()?;
+            if self.is_end(&value) { return Some(cost) }
 
             for (added_cost, new_value) in self.neighbours(&value) {
                 let new_cost = cost + added_cost;
