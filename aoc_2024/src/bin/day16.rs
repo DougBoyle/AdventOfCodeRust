@@ -1,4 +1,4 @@
-use std::collections::{hash_map::Entry, BinaryHeap, HashMap, HashSet};
+use std::collections::{hash_map::Entry, HashMap, HashSet};
 
 use aoc_2024::read_input;
 use rust_aoc::{direction::Direction, grid::Grid, point::Point, Dijkstra, ExhaustiveDijkstra};
