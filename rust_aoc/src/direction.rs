@@ -14,6 +14,10 @@ impl Direction {
         [Direction::North, Direction::South, Direction::East, Direction::West]
     }
 
+    pub fn neighbours(point: Point) -> [Point; 4] {
+        Self::all().map(|dir| point + dir)
+    }
+
     pub const fn opposite(&self) -> Direction {
         match &self {
             Direction::North => Direction::South,

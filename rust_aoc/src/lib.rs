@@ -1,6 +1,6 @@
 
 use std::{
-    collections::{BinaryHeap, HashMap, HashSet, VecDeque}, fs::File, io::{BufRead, BufReader}
+    collections::{BinaryHeap, HashMap, HashSet, VecDeque}, fs::File, hash::Hash, io::{BufRead, BufReader}
 };
 
 pub mod point;
@@ -34,6 +34,14 @@ pub fn assert_single<T, I: Iterator<Item=T>>(it: I) -> T {
     let items: Vec<_> = it.collect();
     assert!(items.len() == 1);
     items.into_iter().next().unwrap()
+}
+
+pub fn count_occurrences<T: Eq + Hash, I: Iterator<Item=T>>(it: I) -> HashMap<T, usize> {
+    let mut occurrences = HashMap::new();
+    for value in it {
+        occurrences.entry(value).and_modify(|count| *count += 1).or_insert(1);
+    }
+    occurrences
 }
 
 pub trait BreadthFirstSearch : Sized {
