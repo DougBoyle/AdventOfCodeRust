@@ -44,6 +44,40 @@ pub fn count_occurrences<T: Eq + Hash, I: Iterator<Item=T>>(it: I) -> HashMap<T,
     occurrences
 }
 
+pub struct MultiHashSet<T: Eq + Hash> {
+    occurrences: HashMap<T, usize>,
+}
+
+impl<T: Eq + Hash> MultiHashSet<T> {
+    pub fn new() -> Self {
+        MultiHashSet { occurrences: HashMap::new() }
+    }
+
+    pub fn insert(&mut self, value: T) {
+        self.insert_many(value, 1);
+    }
+
+    pub fn insert_many(&mut self, value: T, count: usize) {
+        self.occurrences.entry(value).and_modify(|counter| *counter += count).or_insert(count);
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item=(&T, &usize)> + '_ {
+        self.occurrences.iter()
+    }
+
+    pub fn into_iter(self) -> impl Iterator<Item=(T, usize)> {
+        self.occurrences.into_iter()
+    }
+
+    pub fn len_unique(&self) -> usize {
+        self.occurrences.keys().count()
+    }
+
+    pub fn len(&self) -> usize {
+        self.occurrences.values().sum()
+    }
+}
+
 pub trait BreadthFirstSearch : Sized {
     type Node;
 
