@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::hash::Hash;
 
 use aoc_2024::read_input;
-use rust_aoc::{graph::BiDirectionalGraph, split_in_two};
+use rust_aoc::{graph::{BiDirectionalGraph, Key}, split_in_two};
 
 fn main() {
     part1();
@@ -13,7 +13,7 @@ fn part1() {
     let graph = parse_input();
 
     let triples = find_triples(&graph).iter()
-        .filter(|nodes| nodes.iter().any(|node| node.starts_with("t")))
+        .filter(|nodes| nodes.iter().any(|node| graph.get_node(node).unwrap().starts_with("t")))
         .count();
 
     println!("Total {}", triples); // 1184
@@ -48,7 +48,7 @@ fn part2() {
     bron_kerbosch_max_cliques(|clique| {
         if clique.len() > max_size {
             max_size = clique.len();
-            password = Some(get_password(clique));
+            password = Some(get_password(clique, &graph));
         } else if clique.len() == max_size {
             password = None; // clear password on ties
         }
@@ -57,20 +57,19 @@ fn part2() {
     println!("Password: {}", password.unwrap()); // hf,hz,lb,lm,ls,my,ps,qu,ra,uc,vi,xz,yv
 }
 
-fn get_password(clique: &Vec<&String>) -> String {
-    let mut copy: Vec<_> = clique.iter().map(|s| String::from(*s)).collect();
+fn get_password(clique: &Vec<Key>, graph: &Graph) -> String {
+    let mut copy: Vec<_> = clique.iter().map(|node| String::from(graph.get_node(node).unwrap())).collect();
     copy.sort();
     copy.join(",")
 }
 
-fn find_triples(graph: &Graph) -> Vec<Vec<&String>> {
+fn find_triples(graph: &Graph) -> Vec<Vec<Key>> {
     let mut triples = Vec::new();
 
-    for first_node in graph.nodes().keys() {
-        let first_node_edges = graph.get_edges(first_node);
-        for second_node in first_node_edges.iter().filter(|node| *node > first_node) {
-            for third_node in first_node_edges.iter()
-            .filter(|node| *node > second_node && graph.get_edges(second_node).contains(*node)) {
+    for first_node in graph.keys() {
+        for second_node in graph.get_edges(&first_node).filter(|&node| node > first_node) {
+            for third_node in graph.get_edges(&first_node)
+            .filter(|&node| node > second_node && graph.has_edge(&node, &second_node)) {
                 let mut triple = vec![first_node, second_node, third_node];
                 triple.sort();
                 triples.push(triple);
@@ -87,11 +86,11 @@ fn find_triples(graph: &Graph) -> Vec<Vec<&String>> {
 /// to node D, as well as nodes E and F, but if D is not connected to E and F then it might
 /// not be part of the maximal clique and will be filtered out at the next size.
 #[allow(dead_code)]
-fn extend_clique<'a>(clique: Vec<&'a String>, graph: &'a Graph) -> Vec<Vec<&'a String>> {
+fn extend_clique(clique: Vec<Key>, graph: &Graph) -> Vec<Vec<Key>> {
     let max_node = *clique.iter().max().unwrap();
     let each_new_nodes = clique.iter()
         .map(|node| graph.get_edges(node))
-        .map(|node_edges| node_edges.iter().filter(|node| *node > max_node).collect());
+        .map(|node_edges| node_edges.filter(|node| *node > max_node).collect());
     let new_nodes = intersect_all(each_new_nodes).unwrap();
     new_nodes.into_iter().map(|node| {
         let mut new_clique = clique.clone();
@@ -121,15 +120,15 @@ fn extend_clique<'a>(clique: Vec<&'a String>, graph: &'a Graph) -> Vec<Vec<&'a S
 ///   the pivot was chosen from (Candidates U Excluded) so is connected to everything already in Clique, and to all of
 ///   its neighbours, so this new clique cannot be maximal since the pivot could be added to it.
 /// The best choice of pivot is the one with most neighbours in Candidates, minimising the number of recursive calls.
-fn bron_kerbosch_max_cliques<F: FnMut(&Vec<&String>)>(mut f: F, graph: &Graph) {
-    let nodes = graph.nodes().keys().collect();
+fn bron_kerbosch_max_cliques<F: FnMut(&Vec<Key>)>(mut f: F, graph: &Graph) {
+    let nodes = graph.keys().collect();
     bron_kerbosch_max_cliques_helper(&mut Vec::new(), nodes, HashSet::new(), &mut f, graph);
 }
 
-fn bron_kerbosch_max_cliques_helper<'a, F: FnMut(&Vec<&String>)>(
-    clique: &mut Vec<&'a String>,
-    mut candidates: HashSet<&'a String>,
-    mut excluded: HashSet<&'a String>,
+fn bron_kerbosch_max_cliques_helper<'a, F: FnMut(&Vec<Key>)>(
+    clique: &mut Vec<Key>,
+    mut candidates: HashSet<Key>,
+    mut excluded: HashSet<Key>,
     f: &mut F,
     graph: &'a Graph
 ) {
@@ -139,19 +138,19 @@ fn bron_kerbosch_max_cliques_helper<'a, F: FnMut(&Vec<&String>)>(
     }
     // Choose pivot and get its relevant edges to exclude
     let skip_neighbours = candidates.union(&excluded)
-        .map(|pivot| candidates.intersection(&graph.get_edges(pivot).iter().collect()).map(|s| *s).collect::<HashSet<_>>())
+        .map(|pivot| candidates.intersection(&graph.get_edges(pivot).collect()).copied().collect::<HashSet<_>>())
         .max_by_key(|neighbours| neighbours.len())
         .unwrap();
     // Iterate remaining candidates
-    let to_explore = candidates.iter().map(|s| *s).filter(|s| !skip_neighbours.contains(s)).collect::<Vec<_>>();
+    let to_explore = candidates.iter().filter(|s| !skip_neighbours.contains(s)).copied().collect::<Vec<_>>();
     for candidate in to_explore {
         clique.push(candidate);
-        let edges = graph.get_edges(candidate).iter().collect();
-        let new_candidates = candidates.intersection(&edges).map(|s| *s).collect();
-        let new_excluded = excluded.intersection(&edges).map(|s| *s).collect();
+        let edges = graph.get_edges(&candidate).collect();
+        let new_candidates = candidates.intersection(&edges).copied().collect();
+        let new_excluded = excluded.intersection(&edges).copied().collect();
         bron_kerbosch_max_cliques_helper(clique, new_candidates, new_excluded, f, graph);
 
-        candidates.remove(candidate);
+        candidates.remove(&candidate);
         excluded.insert(candidate);
         clique.pop();
     }
@@ -161,17 +160,14 @@ fn intersect_all<T: Eq + Hash + Copy>(sets: impl Iterator<Item=HashSet<T>>) -> O
     sets.reduce(|set1, set2| set1.intersection(&set2).map(|s| *s).collect())
 }
 
-// TODO: Replace with int keys and String values?
-type Graph = BiDirectionalGraph<String, ()>;
+type Graph = BiDirectionalGraph<String>;
 
 fn parse_input() -> Graph {
     let mut graph = Graph::new();
     for line in read_input(23) {
         let (first, second) = split_in_two(&line, '-');
-        let first = first.to_string();
-        let second = second.to_string();
-        if !graph.has_node(&first) { graph.insert_node(first.clone(), ()); }
-        if !graph.has_node(&second) { graph.insert_node(second.clone(), ()); }
+        let first = graph.get_key_or_insert(first.to_string());
+        let second = graph.get_key_or_insert(second.to_string());
         graph.insert_edge(first, second);
     }
     graph
