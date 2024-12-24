@@ -12,6 +12,9 @@ fn main() {
     part2();
 }
 
+const MAX_INPUT: u32 = 44;
+const MAX_OUTPUT: u32 = MAX_INPUT + 1;
+
 fn part1() {
     let Input { mut outputs, gates } = parse_input();
 
@@ -38,21 +41,6 @@ Input bit 13: errors [13, 14]   -- solved by swapping Z13 and NPF (Output / fina
 Input bit 18: errors [19, 20]   -- solved by swapping Z19 and CPH (Output / direct carry for bit 19)
 Input bit 19: errors [19, 20]   -- solved by swapping Z19 and CPH (Output / direct carry for bit 19)
 Input bit 32: errors [33, 34]   -- solved by swapping Z33 and HGJ (Output / indirect carry for bit 33)
-
-Three bit errors (11 + 01 = 100):
-Input bit 8: errors [9]
-Input bit 9: errors [9, 10, 11]
-Input bit 11: errors [13, 14]
-Input bit 12: errors [13, 14]
-Input bit 13: errors [13, 14, 15]
-Input bit 17: errors [19, 20]
-Input bit 19: errors [19, 20, 21]
-Input bit 31: errors [33, 34]
-Input bit 32: errors [33, 34]
-
-!! 5 possible errors per bit, how to distinguish?
-    XOR / final carry interchangeable
-
 */
 fn part2() {
     let Input { mut gates, .. } = parse_input();
@@ -68,7 +56,7 @@ fn part2() {
     }
 
     part2_output_validation(&gates);
-    part2_validation_experiment(gates);
+    part2_validation_experiment(&gates);
 
     // Another idea, add topological sort edges and look for swaps to resolve that (more generic problem):
     // Obviously need x/y values before same z value, and should be able to compute z_i without later x/y values.
@@ -83,7 +71,6 @@ fn part2() {
 fn part2_output_validation(gates: &Gates) {
     test_one_bit_errors(gates);
     test_two_bit_errors(gates);
-    test_three_bit_errors(gates);
 }
 
 fn test_one_bit_errors(gates: &Gates) {
@@ -91,7 +78,7 @@ fn test_one_bit_errors(gates: &Gates) {
     let gates_order = sort_gates.sort().unwrap();
 
     println!("Single bit errors:");
-    for i in 0..45 {
+    for i in 0..MAX_OUTPUT {
         let x = 1 << i;
         let actual = test_input(x, 0, gates, &gates_order);
         if x != actual {
@@ -106,7 +93,7 @@ fn test_two_bit_errors(gates: &Gates) {
     let gates_order = sort_gates.sort().unwrap();
 
     println!("Two bit errors:");
-    for i in 0..45 {
+    for i in 0..MAX_OUTPUT {
         let x = 1 << i;
         let expected = 2*x;
         let actual = test_input(x, x, gates, &gates_order);
@@ -117,26 +104,9 @@ fn test_two_bit_errors(gates: &Gates) {
     println!("");
 }
 
-fn test_three_bit_errors(gates: &Gates) {
-    let mut sort_gates = TopoSortGates { gates: &gates };
-    let gates_order = sort_gates.sort().unwrap();
-
-    println!("Three bit errors (11 + 01 = 100):");
-    for i in 0..44 {
-        let x = (1 << i) | (1 << i+1);
-        let y = 1 << i;
-        let expected = x + y;
-        let actual = test_input(x, y, gates, &gates_order);
-        if expected != actual {
-            println!("Input bit {i} error:\nExpected: {expected:0>46b}\nActual:   {actual:0>46b}");
-        }
-    }
-    println!("");
-}
-
 fn test_input(x: u64, y: u64, gates: &Gates, gates_order: &Vec<&Label>) -> u64 {
     let mut outputs = HashMap::new();
-    for bit in 0..45 {
+    for bit in 0..MAX_OUTPUT {
         outputs.insert(Label::InputX(bit), ((x >> bit) & 1) != 0);
         outputs.insert(Label::InputY(bit), ((y >> bit) & 1) != 0);
     }
@@ -144,21 +114,78 @@ fn test_input(x: u64, y: u64, gates: &Gates, gates_order: &Vec<&Label>) -> u64 {
     eval(&mut outputs, &gates, &gates_order)
 }
 
-// Only direct/indirect carry appear as inputs to an OR gate (excluding z00, no indirect carry to OR with)
+/// Basic outline of an adder block, ignoring special cases for first/last bit:
+/// x_n ^ y_n -> xor n
+/// x_n & y_n -> direct carry n
+/// xor n ^ final carry (n-1) -> z_n
+/// xor n & final carry (n-1) -> indirect carry n
+/// direct carry n OR indirect carry n -> final carry n
+
+/// Only direct/indirect carry appear as inputs to an OR gate (excluding z00, no indirect carry to OR with).
+/// Interchangeable for a given bit.
 fn is_direct_or_indirect_carry_from_usage(gate: &Label, gates: &Gates) -> bool {
     gates.values()
         .any(|Gate { kind, left, right }| *kind == GateKind::OR && (gate == left || gate == right))
 }
 
-// Could incrementally go:
-// literal x/y 00 gates -> indirect gates and output
-// previous indirect gate + literal x/y 01 gates -> output 01 and 01 indirect gate
-// if set every grows more than expected, need to change some wires, but unclear which?
-fn part2_validation_experiment(gates: Gates) {
+/// These pairs are &'d to get next direct carry, and XOR'd to get next output. Interchangeable for a given bit.
+fn get_final_carry_and_next_xor_pairs_from_usage(gates: &Gates) -> Vec<HashSet<Label>> {
+    gates.values()
+        .filter(|gate| gate.kind == GateKind::AND) // could equally have taken the XOR gate
+        .filter(|Gate { left, right, .. }| !left.is_input() && !right.is_input()) // distinguish from other AND uses
+        .map(|Gate { left, right, .. }| [left, right].into_iter().cloned().collect::<HashSet<_>>())
+        .collect()
+}
+
+/// x_n ^ y_n -> ? (should be the intermediate gate labelled above as 'xor n', but might not be used like that in later inputs)
+fn get_output_wires_of_input_xor_gates(gates: &Gates) -> BTreeMap<u32, Label> {
+    gates.iter().filter_map(|(label, Gate { left, right, kind })| {
+        if *kind != GateKind::XOR { return None; }
+        let n = matching_input_bits(left, right)?;
+        Some((n, label.clone()))
+    }).collect()
+}
+
+/// x_n & y_n -> ? (should be the intermediate gate labelled above as 'direct carry', but might not be used like that in later inputs)
+fn get_output_wires_of_input_direct_carry_gates(gates: &Gates) -> BTreeMap<u32, Label> {
+    gates.iter().filter_map(|(label, Gate { left, right, kind })| {
+        if *kind != GateKind::AND { return None; }
+        let n = matching_input_bits(left, right)?;
+        Some((n, label.clone()))
+    }).collect()
+}
+
+fn check_output_gates(gates: &Gates) {
+    // z_i gates in the wrong place:
+    let misplaced_outputs: Vec<_> = gates.iter()
+        .filter(|(label, Gate { kind, left, right })| {
+            let correct = match label {
+                Label::OutputZ(0) => {
+                    let (a, b) = (Label::InputX(0), Label::InputY(0));
+                    *kind == GateKind::XOR && (*left == a && *right == b || *left == b && *right == a)
+                },
+                Label::OutputZ(MAX_OUTPUT) => {
+                    *kind == GateKind::OR && left.is_intermediate_gate() && right.is_intermediate_gate()
+                },
+                Label::OutputZ(_) => {
+                    *kind == GateKind::XOR && left.is_intermediate_gate() && right.is_intermediate_gate()
+                },
+                _ => true,
+            };
+            !correct
+        }).collect();
+    println!("Misplaced output wires: {misplaced_outputs:#?}");
+
+    // other gates where z_i expected:
+    let other_labels_where_output_expected: Vec<_> = gates.iter()
+        .filter(|(label, Gate { kind, left, right })| {
+            !label.is_output() && *kind == GateKind::XOR && left.is_intermediate_gate() && right.is_intermediate_gate()
+        }).collect();
+    println!("Non-output wire after what looks like output gate: {other_labels_where_output_expected:#?}");
+}
+
+fn part2_validation_experiment(gates: &Gates) {
     // 222 gates
-    // Except for first/last digit:
-    // XOR x/y/carry to get output - 2 new gates
-    // (x AND y) can produce a carry, else so can ((x ^ y) AND previous carry), OR these for actual carry - 3 new gates
 
     // X and Y each 45 bit numbers
     // x00 ^ y00 -> z00
@@ -181,138 +208,32 @@ fn part2_validation_experiment(gates: Gates) {
     // 2 + 44*5 = 222, no room for any extra gates
     assert_eq!(222, gates.len());
 
-    // Need ways to validate each output, even when other outputs could be wrong (but inputs always correct!):
-    // 'xor':
-    // x_i ^ y_i => {}
-    // Some G s.t.  '{} ^ G => _' and '{} & G => _'  -- can also use to pair up 'final carry i' to 'xor i+1' 
-    
-    // 'direct carry'
-    // x_i & y_i => {}
-    // '{} OR _ => _'
-    
-    // 'indirect carry'
-    // '{} OR _ => _'
-
-    // Can split into literal operations 'x_i & y_i' / 'x_i ^ y_i' and derived operations on generated outputs.
-
     let all_gates: HashSet<_> = gates.iter().flat_map(|(output, Gate { left, right, .. })| [left, right, output]).collect();
 
     // Direct / Indirect carry gates are interchangeable (for the same bit)
-    // Subset of all possible direct/indirect carry gates: Appears in an OR gate - 88 gates, must be one of them!
+    // Subset of all possible direct/indirect carry gates
     let all_possible_direct_indirect_carries: HashSet<_> = all_gates.iter().copied()
-        .filter(|gate| is_direct_or_indirect_carry_from_usage(gate, &gates)).collect();
+        .filter(|gate| is_direct_or_indirect_carry_from_usage(gate, gates)).collect();
     
     // Interchangeable pairs of gates
-    let carry_and_next_xor_pairs: Vec<HashSet<_>> = gates.values()
-        .filter(|gate| gate.kind == GateKind::AND) // could equally have taken the XOR gate
-        .filter(|Gate { left, right, .. }| !left.is_input() && !right.is_input())
-        .map(|Gate { left, right, .. }| [left, right].into_iter().collect::<HashSet<_>>())
-        .collect();
-    // Subset of all possible xor/final carry gates: Appears in both an XOR and AND - 88 gates, must be one of them!
+    let carry_and_next_xor_pairs: Vec<HashSet<_>> = get_final_carry_and_next_xor_pairs_from_usage(gates);
     let all_possible_xor_and_final_carries: Vec<_> = carry_and_next_xor_pairs.iter().flat_map(|set| set.iter()).collect();
-    // Final carry: Of the derived operations: On LHS of XOR / AND, and RHS of OR. Take best 2 of 3?
-    
-    
-    // Outputs are either x00 ^ y00 = z00, 'derived | derived == z45', or for all others 'derived ^ derived = z_i'
-    let incorrect_outputs: Vec<_> = (0..46).filter_map(|i| {
-        let gate = &gates[&Label::OutputZ(i)];
-        let Gate { kind, left, right } = gate;
-        let correct = if i == 0 {
-            let (a, b) = (Label::InputX(i), Label::InputY(i));
-            *kind == GateKind::XOR && (*left == a && *right == b || *left == b && *right == a)
-        } else if i == 45 {
-            *kind == GateKind::OR && left.is_intermediate_gate() && right.is_intermediate_gate()
-        } else {
-            *kind == GateKind::XOR && left.is_intermediate_gate() && right.is_intermediate_gate()
-        };
-        if correct { None } else { Some((i, gate)) }
-    }).collect();
-    println!("{} incorrect output gates: {incorrect_outputs:?}", incorrect_outputs.len());
 
-    // x_n ^ y_n -> xor gate != z00
-    let mut xor_gates = BTreeMap::new();
-    for (output, Gate { left, right, kind }) in &gates {
-        if *kind != GateKind::XOR { continue; }
-        if let Some(bit) = matching_input_bits(left, right) {
-            xor_gates.insert(bit, output);
-        }
-    }
-    println!("Found {} of 45 XOR gates: {xor_gates:?}", xor_gates.len());
-    assert_eq!(45, xor_gates.len());
-    // On the RHS of an XOR, but not used as one (could also be a final carry, not detected here)
-    let incorrect_xor_outputs: Vec<_> = xor_gates.iter()
-        .filter(|(_, gate)| ***gate != Label::OutputZ(0) && !all_possible_xor_and_final_carries.contains(gate))
-        .collect();
-    // 1 - nnt - appears in an OR - must be a direct/indirect carry instead
-    println!("Found {} incorrect XOR outputs: {incorrect_xor_outputs:?}", incorrect_xor_outputs.len());
+    check_output_gates(gates);
 
-    let mut direct_carry_gates = BTreeMap::new();
-    for (output, Gate { left, right, kind }) in &gates {
-        if *kind != GateKind::AND { continue; }
-        if let Some(bit) = matching_input_bits(left, right) {
-            direct_carry_gates.insert(bit, output);
-        }
-    }
-    println!("Found {} of 45 direct carry gates: {direct_carry_gates:?}", direct_carry_gates.len());
-    assert_eq!(45, direct_carry_gates.len());
+    let xor_output_wires = get_output_wires_of_input_xor_gates(gates);
+    // Output wires of input XORs, but not in the set of XOR and final carry labels as determined by their usage as inputs
+    let other_labels_where_xor_expected: BTreeMap<_,_> = xor_output_wires.into_iter()
+        .filter(|(i, label)| *i != 0 || *label != Label::OutputZ(0)) // special-case at start
+        .filter(|(_, label)| !all_possible_xor_and_final_carries.contains(&label)).collect();
+    println!("Non-XOR wire (based on usage) after what looks like inputs XOR gate: {other_labels_where_xor_expected:#?}");
 
-    // On the RHS of a literal AND, but not used in later OR (excluding x00 & y00)
-    let incorrect_direct_carries: Vec<_> = direct_carry_gates.iter()
-        .filter(|(&i, gate)| i != 0 && !all_possible_direct_indirect_carries.contains(*gate))
-        .collect();
-    // 1 - nnt - appears in an OR - must be a direct/indirect carry instead
-    println!("Found {} incorrect direct carry outputs: {incorrect_direct_carries:?}", incorrect_direct_carries.len());
-
-    let mut indirect_carry_gates = BTreeMap::new();
-    let mut final_carry_gates = BTreeMap::new();
-    // No indirect carry for the first bit, so this is done specially
-    final_carry_gates.insert(0, direct_carry_gates[&0]);
-    for i in 1..44 {
-        let xor = xor_gates[&i];
-        let direct_carry = direct_carry_gates[&i];
-        let previous_carry = match final_carry_gates.get(&(i - 1)) {
-            Some(previous_carry) => *previous_carry,
-            None => continue,
-        };
-
-        if let Some(indirect_carry) = gates.iter().filter(|(_, gate)|
-            gate.kind == GateKind::AND
-            && (gate.left == *xor && gate.right == *previous_carry 
-                || gate.left == *previous_carry && gate.right == *xor)
-        ).map(|(output, _)| output).next() {
-            indirect_carry_gates.insert(i, indirect_carry);
-
-            // 'direct carry i OR indirect carry i -> final carry 01'
-            gates.iter().filter(|(_, gate)|
-                gate.kind == GateKind::OR
-                && (gate.left == *direct_carry && gate.right == *indirect_carry 
-                    || gate.left == *indirect_carry && gate.right == *direct_carry)
-            ).map(|(output, _)| output).next()
-            .and_then(|final_carry| final_carry_gates.insert(i, final_carry));
-        }
-        if !final_carry_gates.contains_key(&i) {
-            // Instead try to determine final carry based on 'xor i+1 ^ final carry i -> z i+1'
-            let next_xor = xor_gates[&(i + 1)];
-            let next_output = Label::OutputZ(i + 1);
-            gates.iter().filter_map(|(output, gate)| {
-                if gate.kind != GateKind::XOR || *output != next_output {
-                    None
-                } else if gate.left == *next_xor {
-                    Some(&gate.right)
-                } else if gate.right == *next_xor {
-                    Some(&gate.left)
-                } else {
-                    None
-                }
-            }).next().and_then(|final_carry| final_carry_gates.insert(i, final_carry));
-        }
-    }
-
-    println!("Found {} of 44 indirect carry gates: {indirect_carry_gates:?}", indirect_carry_gates.len());
- //   assert_eq!(44, indirect_carry_gates.len());
-
-    println!("Found {} of 45 final carry gates: {final_carry_gates:?}", final_carry_gates.len());
- //   assert_eq!(45, final_carry_gates.len());
+    let direct_carry_output_wires = get_output_wires_of_input_direct_carry_gates(gates);
+    // Output wires of 'x_n & y_n', but not in the set of direct/indirect carry labels as determined by their usage as inputs
+    let other_labels_where_direct_carry_expected: BTreeMap<_,_> = direct_carry_output_wires.into_iter()
+        .filter(|(i, _)| *i != 0) // special-case at start
+        .filter(|(_, label)| !all_possible_direct_indirect_carries.contains(label)).collect();
+    println!("Non direct carry wire (based on usage) after what looks like x_n & y_n gate: {other_labels_where_direct_carry_expected:#?}");
 }
 
 fn get_x_gate(i: u32) -> String {
@@ -401,6 +322,10 @@ impl Label {
             Label::InputX(_) | Label::InputY(_) => true,
             _ => false,
         }
+    }
+
+    fn is_output(&self) -> bool {
+        matches!(self, Label::OutputZ(_))
     }
 
     fn is_intermediate_gate(&self) -> bool {
