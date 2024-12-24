@@ -1,10 +1,11 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
+use std::fmt::Debug;
 use std::hash::Hash;
-use std::ptr::read;
+use std::str::FromStr;
 
 use aoc_2024::read_input;
 use rust_aoc::TopologicalSort;
-use rust_aoc::{graph::{BiDirectionalGraph, Key}, split_in_two};
+use rust_aoc::split_in_two;
 
 fn main() {
     part1();
@@ -12,27 +13,17 @@ fn main() {
 }
 
 fn part1() {
-    let Input { mut outputs, gates, result_wires_lsb_to_msb } = parse_input();
+    let Input { mut outputs, gates } = parse_input();
 
     let mut sort_gates = TopoSortGates { gates: &gates };
     let gates_order = sort_gates.sort().unwrap();
-    eval(&mut outputs, &gates, &gates_order);
-
-    let mut total: u64 = 0;
-    // most significant bit first
-    for wire in result_wires_lsb_to_msb.iter().rev() {
-        total <<= 1;
-        if outputs[wire] { total += 1 };
-    }
+    let total = eval(&mut outputs, &gates, &gates_order);
 
     println!("Total {total}"); // 42049478636360
 }
 
-// TODO: Easier approach, put through 1 bit at a time and see where wrong output set?
-//       But then hard to tell what to swap with what, and at what level?
-
 /*
-TODO: At end can categorise failures -> specific swaps
+Note: Can't immediately categorise the different failures from this alone.
 
 Single bit errors:
 Input bit 9: errors [9, 10]     -- solved by swapping NNT and GWS (Direct carry / XOR for bit 9)
@@ -48,82 +39,122 @@ Input bit 18: errors [19, 20]   -- solved by swapping Z19 and CPH (Output / dire
 Input bit 19: errors [19, 20]   -- solved by swapping Z19 and CPH (Output / direct carry for bit 19)
 Input bit 32: errors [33, 34]   -- solved by swapping Z33 and HGJ (Output / indirect carry for bit 33)
 
+Three bit errors (11 + 01 = 100):
+Input bit 8: errors [9]
+Input bit 9: errors [9, 10, 11]
+Input bit 11: errors [13, 14]
+Input bit 12: errors [13, 14]
+Input bit 13: errors [13, 14, 15]
+Input bit 17: errors [19, 20]
+Input bit 19: errors [19, 20, 21]
+Input bit 31: errors [33, 34]
+Input bit 32: errors [33, 34]
+
 !! 5 possible errors per bit, how to distinguish?
     XOR / final carry interchangeable
 
 */
 fn part2() {
-    let Input { mut outputs, mut gates, result_wires_lsb_to_msb } = parse_input();
+    let Input { mut gates, .. } = parse_input();
 
     println!("Num gates: {}", gates.len());
 
-    let swaps = vec![("nnt", "gws"), ("z19", "cph"), ("z13", "npf"), ("z33", "hgj")];
+    let swaps: Vec<(Label, Label)> = vec![];// vec![("nnt", "gws"), ("z19", "cph"), ("z13", "npf"), ("z33", "hgj")];
     for (first, second) in &swaps {
-        let first_gate = gates.remove(*first).unwrap();
-        let second_gate = gates.remove(*second).unwrap();
-        gates.insert(first.to_string(), second_gate);
-        gates.insert(second.to_string(), first_gate);
+        let first_gate = gates.remove(first).unwrap();
+        let second_gate = gates.remove(second).unwrap();
+        gates.insert(first.clone(), second_gate);
+        gates.insert(second.clone(), first_gate);
     }
 
-    part2_output_validation(&gates, result_wires_lsb_to_msb);
+    part2_output_validation(&gates);
     part2_validation_experiment(gates);
 
     // Another idea, add topological sort edges and look for swaps to resolve that (more generic problem):
     // Obviously need x/y values before same z value, and should be able to compute z_i without later x/y values.
     // x_i, y_i -> z_i -> x_(i+1), y_(i+1)
 
-    let mut answer: Vec<_> = swaps.into_iter().flat_map(|(a, b)| [a, b]).collect();
+    let mut answer: Vec<_> = swaps.into_iter().flat_map(|(a, b)| [a, b]).map(|label| label.to_string()).collect();
     answer.sort();
     let answer = answer.join(",");
     println!("Answer: {answer}"); // cph,gws,hgj,nnt,npf,z13,z19,z33
 }
 
-fn part2_output_validation(gates: &HashMap<String, Gate>, result_wires_lsb_to_msb: Vec<String>) {
+fn part2_output_validation(gates: &Gates) {
+    test_one_bit_errors(gates);
+    test_two_bit_errors(gates);
+    test_three_bit_errors(gates);
+}
+
+fn test_one_bit_errors(gates: &Gates) {
     let mut sort_gates = TopoSortGates { gates: &gates };
     let gates_order = sort_gates.sort().unwrap();
 
     println!("Single bit errors:");
     for i in 0..45 {
-        // x/y interchangeable
-        let mut outputs = HashMap::new();
-        for bit in 0..45 {
-            let x_val = bit == i;
-            outputs.insert(get_x_gate(bit), x_val);
-            outputs.insert(get_y_gate(bit), false);
-        }
-
-        eval(&mut outputs, &gates, &gates_order);
-        let errors: Vec<_> = (0..46).filter(|&bit| outputs[&get_output_gate(bit)] != (i == bit)).collect();
-        
-        if !errors.is_empty() {
-            println!("Input bit {i}: errors {errors:?}");
+        let x = 1 << i;
+        let actual = test_input(x, 0, gates, &gates_order);
+        if x != actual {
+            println!("Input bit {i} error:\nExpected: {x:0>46b}\nActual:   {actual:0>46b}");
         }
     }
+    println!("");
+}
+
+fn test_two_bit_errors(gates: &Gates) {
+    let mut sort_gates = TopoSortGates { gates: &gates };
+    let gates_order = sort_gates.sort().unwrap();
 
     println!("Two bit errors:");
     for i in 0..45 {
-        // x/y interchangeable
-        let mut outputs = HashMap::new();
-        for bit in 0..45 {
-            let val = bit == i;
-            outputs.insert(get_x_gate(bit), val);
-            outputs.insert(get_y_gate(bit), val);
-        }
-
-        eval(&mut outputs, &gates, &gates_order);
-        let errors: Vec<_> = (0..46).filter(|&bit| outputs[&get_output_gate(bit)] != (i+1 == bit)).collect();
-        
-        if !errors.is_empty() {
-            println!("Input bit {i}: errors {errors:?}");
+        let x = 1 << i;
+        let expected = 2*x;
+        let actual = test_input(x, x, gates, &gates_order);
+        if expected != actual {
+            println!("Input bit {i} error:\nExpected: {expected:0>46b}\nActual:   {actual:0>46b}");
         }
     }
+    println!("");
+}
+
+fn test_three_bit_errors(gates: &Gates) {
+    let mut sort_gates = TopoSortGates { gates: &gates };
+    let gates_order = sort_gates.sort().unwrap();
+
+    println!("Three bit errors (11 + 01 = 100):");
+    for i in 0..44 {
+        let x = (1 << i) | (1 << i+1);
+        let y = 1 << i;
+        let expected = x + y;
+        let actual = test_input(x, y, gates, &gates_order);
+        if expected != actual {
+            println!("Input bit {i} error:\nExpected: {expected:0>46b}\nActual:   {actual:0>46b}");
+        }
+    }
+    println!("");
+}
+
+fn test_input(x: u64, y: u64, gates: &Gates, gates_order: &Vec<&Label>) -> u64 {
+    let mut outputs = HashMap::new();
+    for bit in 0..45 {
+        outputs.insert(Label::InputX(bit), ((x >> bit) & 1) != 0);
+        outputs.insert(Label::InputY(bit), ((y >> bit) & 1) != 0);
+    }
+
+    eval(&mut outputs, &gates, &gates_order)
+}
+
+// Only direct/indirect carry appear as inputs to an OR gate (excluding z00, no indirect carry to OR with)
+fn is_direct_or_indirect_carry_from_usage(gate: &Label, gates: &Gates) -> bool {
+    gates.values()
+        .any(|Gate { kind, left, right }| *kind == GateKind::OR && (gate == left || gate == right))
 }
 
 // Could incrementally go:
 // literal x/y 00 gates -> indirect gates and output
 // previous indirect gate + literal x/y 01 gates -> output 01 and 01 indirect gate
 // if set every grows more than expected, need to change some wires, but unclear which?
-fn part2_validation_experiment(gates: HashMap<String, Gate>) {
+fn part2_validation_experiment(gates: Gates) {
     // 222 gates
     // Except for first/last digit:
     // XOR x/y/carry to get output - 2 new gates
@@ -164,16 +195,17 @@ fn part2_validation_experiment(gates: HashMap<String, Gate>) {
 
     // Can split into literal operations 'x_i & y_i' / 'x_i ^ y_i' and derived operations on generated outputs.
 
+    let all_gates: HashSet<_> = gates.iter().flat_map(|(output, Gate { left, right, .. })| [left, right, output]).collect();
+
     // Direct / Indirect carry gates are interchangeable (for the same bit)
     // Subset of all possible direct/indirect carry gates: Appears in an OR gate - 88 gates, must be one of them!
-    let all_possible_direct_indirect_carries: Vec<_> = gates.values()
-        .filter(|gate| gate.kind == GateKind::OR)
-        .flat_map(|Gate { left, right, .. }| [left, right])
-        .collect();
+    let all_possible_direct_indirect_carries: HashSet<_> = all_gates.iter().copied()
+        .filter(|gate| is_direct_or_indirect_carry_from_usage(gate, &gates)).collect();
+    
     // Interchangeable pairs of gates
     let carry_and_next_xor_pairs: Vec<HashSet<_>> = gates.values()
         .filter(|gate| gate.kind == GateKind::AND) // could equally have taken the XOR gate
-        .filter(|Gate { left, right, .. }| !left.starts_with("x") && !left.starts_with("y") && !right.starts_with("x") && !right.starts_with("y"))
+        .filter(|Gate { left, right, .. }| !left.is_input() && !right.is_input())
         .map(|Gate { left, right, .. }| [left, right].into_iter().collect::<HashSet<_>>())
         .collect();
     // Subset of all possible xor/final carry gates: Appears in both an XOR and AND - 88 gates, must be one of them!
@@ -183,15 +215,15 @@ fn part2_validation_experiment(gates: HashMap<String, Gate>) {
     
     // Outputs are either x00 ^ y00 = z00, 'derived | derived == z45', or for all others 'derived ^ derived = z_i'
     let incorrect_outputs: Vec<_> = (0..46).filter_map(|i| {
-        let gate = &gates[&get_output_gate(i)];
+        let gate = &gates[&Label::OutputZ(i)];
         let Gate { kind, left, right } = gate;
         let correct = if i == 0 {
-            let (a, b) = (get_x_gate(i), get_y_gate(i));
+            let (a, b) = (Label::InputX(i), Label::InputY(i));
             *kind == GateKind::XOR && (*left == a && *right == b || *left == b && *right == a)
         } else if i == 45 {
-            *kind == GateKind::OR && is_intermediate_gate(left) && is_intermediate_gate(right)
+            *kind == GateKind::OR && left.is_intermediate_gate() && right.is_intermediate_gate()
         } else {
-            *kind == GateKind::XOR && is_intermediate_gate(left) && is_intermediate_gate(right)
+            *kind == GateKind::XOR && left.is_intermediate_gate() && right.is_intermediate_gate()
         };
         if correct { None } else { Some((i, gate)) }
     }).collect();
@@ -209,7 +241,7 @@ fn part2_validation_experiment(gates: HashMap<String, Gate>) {
     assert_eq!(45, xor_gates.len());
     // On the RHS of an XOR, but not used as one (could also be a final carry, not detected here)
     let incorrect_xor_outputs: Vec<_> = xor_gates.iter()
-        .filter(|(_, gate)| **gate != "z00" && !all_possible_xor_and_final_carries.contains(gate))
+        .filter(|(_, gate)| ***gate != Label::OutputZ(0) && !all_possible_xor_and_final_carries.contains(gate))
         .collect();
     // 1 - nnt - appears in an OR - must be a direct/indirect carry instead
     println!("Found {} incorrect XOR outputs: {incorrect_xor_outputs:?}", incorrect_xor_outputs.len());
@@ -226,7 +258,7 @@ fn part2_validation_experiment(gates: HashMap<String, Gate>) {
 
     // On the RHS of a literal AND, but not used in later OR (excluding x00 & y00)
     let incorrect_direct_carries: Vec<_> = direct_carry_gates.iter()
-        .filter(|(&i, gate)| i != 0 && !all_possible_direct_indirect_carries.contains(gate))
+        .filter(|(&i, gate)| i != 0 && !all_possible_direct_indirect_carries.contains(*gate))
         .collect();
     // 1 - nnt - appears in an OR - must be a direct/indirect carry instead
     println!("Found {} incorrect direct carry outputs: {incorrect_direct_carries:?}", incorrect_direct_carries.len());
@@ -261,9 +293,9 @@ fn part2_validation_experiment(gates: HashMap<String, Gate>) {
         if !final_carry_gates.contains_key(&i) {
             // Instead try to determine final carry based on 'xor i+1 ^ final carry i -> z i+1'
             let next_xor = xor_gates[&(i + 1)];
-            let next_output = format!("z{:0>2}", i+1);
+            let next_output = Label::OutputZ(i + 1);
             gates.iter().filter_map(|(output, gate)| {
-                if gate.kind != GateKind::XOR || **output != next_output {
+                if gate.kind != GateKind::XOR || *output != next_output {
                     None
                 } else if gate.left == *next_xor {
                     Some(&gate.right)
@@ -279,67 +311,57 @@ fn part2_validation_experiment(gates: HashMap<String, Gate>) {
     println!("Found {} of 44 indirect carry gates: {indirect_carry_gates:?}", indirect_carry_gates.len());
  //   assert_eq!(44, indirect_carry_gates.len());
 
-    println!("Final {} of 45 final carry gates: {final_carry_gates:?}", final_carry_gates.len());
+    println!("Found {} of 45 final carry gates: {final_carry_gates:?}", final_carry_gates.len());
  //   assert_eq!(45, final_carry_gates.len());
-
-    // TODO: Now how to debug which gates need swapping to get it to work?
-    assert_eq!(indirect_carry_gates.keys().max().unwrap(), final_carry_gates.keys().max().unwrap());
-    let max_found = final_carry_gates.keys().max().unwrap();
-    println!("Found expected gates up to {max_found}"); // 8
-
-    let to_solve = max_found + 1;
-    let output_to_solve = format!("z{to_solve:0>2}");
-    let output_gate = &gates[&output_to_solve];
-    println!("Output gate: {output_gate:?}");
-    let xor_and_last_final_carry = vec![&output_gate.left, &output_gate.right];
-    
-
-}
-
-fn is_intermediate_gate(gate: &str) -> bool {
-    !gate.starts_with("x") && !gate.starts_with("y") && !gate.starts_with("z")
 }
 
 fn get_x_gate(i: u32) -> String {
-    format!("x{i:0>2}")
+    format_gate('x', i)
 }
 
 fn get_y_gate(i: u32) -> String {
-    format!("y{i:0>2}")
+    format_gate('y', i)
 }
 
 fn get_output_gate(i: u32) -> String {
-    format!("z{i:0>2}")
+    format_gate('z', i)
 }
 
-fn matching_input_bits(left: &str, right: &str) -> Option<u32> {
-    if left.starts_with("x") && right.starts_with("y")
-    || left.starts_with("y") && right.starts_with("x") {
-        if left[1..] == right[1..] {
-            Some(left[1..].parse().unwrap())
-        } else {
-            None
-        }
-    } else {
-        None
+fn format_gate(letter: char, n: u32) -> String {
+    format!("{letter}{n:0>2}")
+}
+
+fn matching_input_bits(left: &Label, right: &Label) -> Option<u32> {
+    match (left, right) {
+        (Label::InputX(n), Label::InputY(m)) if n == m => Some(*n),
+        (Label::InputY(n), Label::InputX(m)) if n == m => Some(*n),
+        _ => None,
     }
 }
 
-fn eval(outputs: &mut HashMap<String, bool>, gates: &HashMap<String, Gate>, gates_order: &Vec<&String>) {
+fn eval(outputs: &mut Outputs, gates: &Gates, gates_order: &Vec<&Label>) -> u64 {
     for &wire in gates_order {
         // sorting includes the direct wire values listed as gate inputs, so skip those
-        if !outputs.contains_key(wire) {
-            outputs.insert(wire.to_string(), gates[wire].eval(&outputs));
+        if !wire.is_input() {
+            outputs.insert(wire.clone(), gates[wire].eval(&outputs));
         }
     }
+
+    let mut total: u64 = 0;
+    for i in 0..46 {
+        if outputs[&Label::OutputZ(i)] {
+            total += 1 << i;
+        }
+    }
+    total
 }
 
 struct TopoSortGates<'a> {
-    gates: &'a HashMap<String, Gate>,
+    gates: &'a Gates,
 }
 
 impl<'a> TopologicalSort for TopoSortGates<'a> {
-    type Node = String;
+    type Node = Label;
 
     fn get_all_nodes(&self) -> Vec<&Self::Node> {
         self.gates.keys().collect()
@@ -357,20 +379,74 @@ impl<'a> TopologicalSort for TopoSortGates<'a> {
     }
 }
 
+type Gates = HashMap<Label, Gate>;
+type Outputs = HashMap<Label, bool>;
+
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 enum GateKind {
     AND, OR, XOR
 }
 
+#[derive(Clone, Eq, PartialEq, Hash)]
+enum Label {
+    InputX(u32),
+    InputY(u32),
+    OutputZ(u32),
+    Intermediate(String),
+}
+
+impl Label {
+    fn is_input(&self) -> bool {
+        match self {
+            Label::InputX(_) | Label::InputY(_) => true,
+            _ => false,
+        }
+    }
+
+    fn is_intermediate_gate(&self) -> bool {
+        matches!(self, Label::Intermediate(_))
+    }
+}
+
+impl ToString for Label {
+    fn to_string(&self) -> String {
+        match self {
+            Label::InputX(n) => get_x_gate(*n),
+            Label::InputY(n) => get_y_gate(*n),
+            Label::OutputZ(n) => get_output_gate(*n),
+            Label::Intermediate(s) => s.clone(),
+        }
+    }
+}
+
+impl FromStr for Label {
+    type Err = std::num::ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s.chars().next() {
+            Some('x') => Label::InputX(s[1..].parse()?),
+            Some('y') => Label::InputY(s[1..].parse()?),
+            Some('z') => Label::OutputZ(s[1..].parse()?),
+            _ => Label::Intermediate(s.to_string()),
+        })
+    }
+}
+
+impl Debug for Label {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_string())
+    }
+}
+
 #[derive(Debug)]
 struct Gate {
     kind: GateKind,
-    left: String,
-    right: String,
+    left: Label,
+    right: Label,
 }
 
 impl Gate {
-    fn eval(&self, outputs: &HashMap<String, bool>) -> bool {
+    fn eval(&self, outputs: &Outputs) -> bool {
         let left = outputs[&self.left];
         let right = outputs[&self.right];
         match self.kind {
@@ -382,24 +458,21 @@ impl Gate {
 }
 
 struct Input {
-    outputs: HashMap<String, bool>,
-    gates: HashMap<String, Gate>,
-    result_wires_lsb_to_msb: Vec<String>,
+    outputs: Outputs,
+    gates: Gates,
 }
 
 fn parse_input() -> Input {
     let mut lines = read_input(24).map(|s| s.trim().to_string());
     let outputs = lines.by_ref().take_while(|s| !s.is_empty()).map(|s| parse_wire_state(&s)).collect();
-    let gates: HashMap<String, Gate> = lines.map(|s| parse_gate(&s)).collect();
-    let mut result_wires_lsb_to_msb: Vec<_> = gates.keys().filter(|s| s.starts_with("z")).map(|s| s.to_string()).collect();
-    result_wires_lsb_to_msb.sort();
+    let gates: Gates = lines.map(|s| parse_gate(&s)).collect();
 
-    Input { outputs, gates, result_wires_lsb_to_msb }
+    Input { outputs, gates }
 }
 
-fn parse_wire_state(line: &str) -> (String, bool) {
+fn parse_wire_state(line: &str) -> (Label, bool) {
     let (wire, state) = split_in_two(line, ':');
-    let wire = wire.to_string();
+    let wire = wire.parse().unwrap();
     let state = match state.trim() {
         "0" => false,
         "1" => true,
@@ -408,7 +481,7 @@ fn parse_wire_state(line: &str) -> (String, bool) {
     (wire, state)
 }
 
-fn parse_gate(line: &str) -> (String, Gate) {
+fn parse_gate(line: &str) -> (Label, Gate) {
     let [gate, output_wire] = line.split(" -> ").collect::<Vec<_>>().try_into().unwrap();
     let [left, op, right] = gate.split_ascii_whitespace().collect::<Vec<_>>().try_into().unwrap();
     let kind = match op {
@@ -417,5 +490,5 @@ fn parse_gate(line: &str) -> (String, Gate) {
         "XOR" => GateKind::XOR,
         _ => panic!("Unexpected operation '{op}'"),
     };
-    (output_wire.to_string(), Gate { kind, left: left.to_string(), right: right.to_string() })
+    (output_wire.parse().unwrap(), Gate { kind, left: left.parse().unwrap(), right: right.parse().unwrap() })
 }
