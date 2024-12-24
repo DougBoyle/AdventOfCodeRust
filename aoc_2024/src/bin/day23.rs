@@ -19,7 +19,6 @@ fn part1() {
     println!("Total {}", triples); // 1184
 }
 
-// TODO: Maximal Clique Problem: https://en.wikipedia.org/wiki/Bron%E2%80%93Kerbosch_algorithm
 fn part2() {
     let graph = parse_input();
     /* 

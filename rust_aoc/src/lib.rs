@@ -222,7 +222,7 @@ impl<T> PartialEq for DijkstraCost<T> {
 
 impl<T> Eq for DijkstraCost<T> {}
 
-
+#[derive(Debug)]
 pub struct GraphContainsCycleError<T> {
     pub from: T,
     pub to: T,
@@ -233,9 +233,13 @@ pub trait TopologicalSort {
 
     fn get_all_nodes(&self) -> Vec<&Self::Node>;
     fn get_edges(&self, node: &Self::Node) -> Vec<&Self::Node>;
+    /// If true, and get_edges(A) contains B i.e. there is an edge A -> B,
+    /// then A will appear before B in the result of the sort.
+    /// If false, the reverse order will be returned i.e. the edge nodes are prerequisits, not dependents.
+    fn edges_point_to_dependents() -> bool;
 
     fn sort(&mut self) -> Result<Vec<&Self::Node>, GraphContainsCycleError<&Self::Node>> {
-        let mut reverse_sorted = Vec::new();
+        let mut leaves_first_sort = Vec::new();
         let mut nodes_seen = HashMap::new();
     
         for node in self.get_all_nodes() {
@@ -264,15 +268,17 @@ pub trait TopologicalSort {
                     },
                     Some(state @ TopologicalSortState::Visiting) => {
                         *state = TopologicalSortState::Visited;
-                        reverse_sorted.push(node);
+                        leaves_first_sort.push(node);
                     },
                     Some(TopologicalSortState::Visited) => {}, // already explored down some other branch
                     None => panic!("Bug, stack contains a node, but no state recorded for it in nodes_seen")
                 }
             }
         }
-        reverse_sorted.reverse();
-        Ok(reverse_sorted)
+        if Self::edges_point_to_dependents() {
+            leaves_first_sort.reverse();
+        }
+        Ok(leaves_first_sort)
     }
 }
 
